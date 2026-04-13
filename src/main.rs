@@ -1,4 +1,12 @@
 mod commands;
+#[allow(dead_code)]
+mod config;
+#[allow(dead_code)]
+mod git;
+#[allow(dead_code)]
+mod ui;
+#[allow(dead_code)]
+mod workspace;
 
 use clap::{Parser, Subcommand};
 
