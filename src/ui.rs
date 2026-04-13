@@ -1,3 +1,4 @@
+use anyhow::bail;
 use console::Style;
 use dialoguer::theme::ColorfulTheme;
 use dialoguer::{Confirm, Input, MultiSelect, Select};
@@ -14,7 +15,7 @@ fn theme() -> ColorfulTheme {
 }
 
 /// Prompt for text input with a default value.
-/// If default is empty, no "()" is shown. Use `placeholder` to show a gray hint.
+/// If default is empty, no "()" is shown. Press ESC to cancel.
 pub fn input(prompt: &str, default: &str) -> anyhow::Result<String> {
     let t = theme();
     let mut builder = Input::<String>::with_theme(&t).with_prompt(prompt);
@@ -61,38 +62,47 @@ pub fn input_optional(prompt: &str, placeholder: &str) -> anyhow::Result<Option<
 }
 
 /// Prompt for a single selection from a list. Returns the selected index.
-/// Active item is highlighted with cyan bold.
+/// Active item is highlighted with cyan bold. Press ESC to cancel.
 pub fn select(prompt: &str, items: &[String]) -> anyhow::Result<usize> {
-    let idx = Select::with_theme(&theme())
+    let result = Select::with_theme(&theme())
         .with_prompt(prompt)
         .items(items)
         .default(0)
-        .interact()?;
-    Ok(idx)
+        .interact_opt()?;
+
+    match result {
+        Some(idx) => Ok(idx),
+        None => bail!("Cancelled"),
+    }
 }
 
 /// Prompt for multi-selection from a list. Returns the selected indices.
-/// Active item is highlighted, checked items show [✓].
+/// Active item is highlighted, checked items show [✓]. Press ESC to cancel.
 pub fn multi_select(
     prompt: &str,
     items: &[String],
     defaults: &[bool],
 ) -> anyhow::Result<Vec<usize>> {
-    let indices = MultiSelect::with_theme(&theme())
+    let result = MultiSelect::with_theme(&theme())
         .with_prompt(prompt)
         .items(items)
         .defaults(defaults)
-        .interact()?;
-    Ok(indices)
+        .interact_opt()?;
+
+    match result {
+        Some(indices) => Ok(indices),
+        None => bail!("Cancelled"),
+    }
 }
 
-/// Prompt for a yes/no confirmation.
+/// Prompt for a yes/no confirmation. Press ESC to cancel (returns false).
 pub fn confirm(prompt: &str, default: bool) -> anyhow::Result<bool> {
     let result = Confirm::with_theme(&theme())
         .with_prompt(prompt)
         .default(default)
-        .interact()?;
-    Ok(result)
+        .interact_opt()?;
+
+    Ok(result.unwrap_or(false))
 }
 
 /// Print a success message with a green checkmark.

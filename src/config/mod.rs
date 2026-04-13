@@ -103,12 +103,6 @@ pub fn resolve_workpath(workpath: &str) -> Result<PathBuf> {
     }
 }
 
-/// Sanitize a name for use as a directory name.
-/// Replaces '/' with '-' to prevent creating nested directories.
-pub fn safe_dir_name(name: &str) -> String {
-    name.replace('/', "-")
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

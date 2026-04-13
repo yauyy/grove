@@ -86,7 +86,7 @@ pub fn run(name: Option<String>) -> Result<()> {
 
     let workpath = config::resolve_workpath(&global.workpath)?;
     let ws = &workspaces_file.workspaces[ws_idx];
-    let ws_dir = workpath.join(config::safe_dir_name(&ws.name));
+    let ws_dir = workpath.join(&ws.name);
     let branch = ws.branch.clone();
 
     // 9. For removals: check uncommitted changes
