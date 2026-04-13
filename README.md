@@ -13,6 +13,8 @@ Grove 让你将多个本地 Git 仓库绑定在一起，统一创建工作分支
 - **批量 Git 操作** — 一条命令同时对所有项目执行 add / commit / push / pull / merge
 - **环境分支管理** — 配置测试、预发、正式环境分支，一键合并发布
 - **AGENTS.md 合并** — 为每个项目配置 AI 代理描述，创建工作区时自动合并
+- **多语言支持** — 支持中文和英文界面，自动检测系统语言
+- **VS Code 集成** — `grove code` 一键用 VS Code 打开工作区
 - **跨平台** — 支持 macOS 和 Windows
 - **极简操作** — 所有常用命令都有短别名，支持 Tab 补全
 
@@ -58,8 +60,8 @@ grove add /path/to/backend
 添加时会交互式引导你：
 
 - 选择分组（前端 / 后端 / 新建分组）
-- 选择远程主分支（如 origin/master）
-- 配置环境分支（测试 / 预发 / 正式，可选）
+- 直接输入远程主分支名（自动校验是否存在）
+- 配置环境分支（测试 / 预发 / 正式，可选，直接输入 + 校验）
 - 配置 agents.md（可选）
 
 ### 2. 创建工作区
@@ -107,11 +109,29 @@ grove sync
 # 编辑工作区（添加/移除项目）
 grove -w feature-login
 
+# 用 VS Code 打开工作区
+grove code feature-login
+
 # 查看所有工作区状态
 grove st
 
 # 删除工作区（清理 worktree + 分支）
 grove delete
+```
+
+### 5. 语言与配置
+
+```bash
+# 切换为中文界面
+grove language zh
+
+# 切换为英文界面
+grove language en
+
+# 直接编辑配置文件
+grove config edit           # 编辑 projects.toml
+grove config edit config    # 编辑 config.toml
+grove config edit workspaces # 编辑 workspaces.toml
 ```
 
 ## 命令参考
@@ -155,12 +175,15 @@ grove delete
 | `grove gpush` | `grove gp` | 推送到远程同名分支 |
 | `grove gpull` | `grove gl` | 拉取远程更新 |
 
-### 配置
+### 配置与工具
 
 | 命令 | 说明 |
 |------|------|
 | `grove config set workpath <path>` | 设置工作区根目录（仅影响新建工作区） |
 | `grove config list` | 查看当前配置 |
+| `grove config edit [file]` | 编辑配置文件（projects/config/workspaces） |
+| `grove code [name]` | 用 VS Code 打开工作区 |
+| `grove language <en/zh>` | 切换界面语言 |
 | `grove completion <shell>` | 生成 Shell 补全脚本 |
 
 ## 配置文件
@@ -169,7 +192,7 @@ grove delete
 
 ```
 ~/.grove/
-├── config.toml          # 全局配置（workpath）
+├── config.toml          # 全局配置（workpath, language）
 ├── projects.toml        # 已注册项目
 ├── workspaces.toml      # 工作区记录
 └── agents/              # 各项目的 agents.md
@@ -202,7 +225,8 @@ grove completion powershell | Out-File ~\grove.ps1
 2. **继续并汇总** — 批量操作不因单个失败而中断，执行完后统一报告
 3. **极简输入** — 所有常用命令提供短别名
 4. **配置仅向前** — `config set workpath` 仅影响新创建的工作区
-5. **跨平台** — 使用 `PathBuf` 处理路径，兼容 macOS 和 Windows
+5. **多语言** — 中英文界面，自动检测系统语言，可手动切换
+6. **跨平台** — 使用 `PathBuf` 处理路径，兼容 macOS 和 Windows
 
 ---
 
@@ -221,6 +245,8 @@ Grove binds multiple local Git repositories together, creating unified work bran
 - **Batch Git operations** — Single command for add / commit / push / pull / merge across all projects
 - **Environment branch management** — Configure test / staging / production branches, merge with one command
 - **AGENTS.md merging** — Per-project AI agent descriptions, auto-merged on workspace creation
+- **i18n support** — Chinese and English UI, auto-detects system locale
+- **VS Code integration** — `grove code` opens workspace in VS Code
 - **Cross-platform** — macOS and Windows
 - **Minimal typing** — Short aliases for all frequent commands, Tab completion
 
@@ -262,7 +288,7 @@ grove add /path/to/frontend
 grove add /path/to/backend
 ```
 
-Interactive prompts guide you through: group selection, remote main branch, environment branches (optional), agents.md (optional).
+Interactive prompts guide you through: group selection, branch name input with remote validation, environment branches (optional), agents.md (optional).
 
 ### 2. Create a Workspace
 
@@ -291,8 +317,18 @@ grove gm          # merge to environment branch
 ```bash
 grove sync        # merge remote main into work branch
 grove -w name     # edit workspace (add/remove projects)
+grove code name   # open workspace in VS Code
 grove st          # view all workspace status
 grove delete      # delete workspace + cleanup
+```
+
+### 5. Language & Config
+
+```bash
+grove language zh           # switch to Chinese
+grove language en           # switch to English
+grove config edit           # edit projects.toml
+grove config edit config    # edit config.toml
 ```
 
 ## Command Reference
@@ -315,7 +351,10 @@ grove delete      # delete workspace + cleanup
 | `grove gcommit` | `gc` | Batch git commit |
 | `grove gpush` | `gp` | Batch git push |
 | `grove gpull` | `gl` | Batch git pull |
+| `grove code [name]` | | Open workspace in VS Code |
+| `grove language <en/zh>` | | Set display language |
 | `grove config set/list` | | Configuration |
+| `grove config edit [file]` | | Edit config file in editor |
 | `grove completion <shell>` | | Shell completions |
 
 ## License
