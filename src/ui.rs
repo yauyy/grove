@@ -14,26 +14,45 @@ fn theme() -> ColorfulTheme {
 }
 
 /// Prompt for text input with a default value.
+/// If default is empty, no "()" is shown. Use `placeholder` to show a gray hint.
 pub fn input(prompt: &str, default: &str) -> anyhow::Result<String> {
+    let t = theme();
+    let mut builder = Input::<String>::with_theme(&t).with_prompt(prompt);
+    if !default.is_empty() {
+        builder = builder.default(default.to_string());
+    }
+    let value = builder.interact_text()?;
+    Ok(value)
+}
+
+/// Prompt for text input with a placeholder hint (shown in gray).
+/// The placeholder is displayed but not used as default value.
+pub fn input_with_placeholder(prompt: &str, placeholder: &str) -> anyhow::Result<String> {
+    let dim = Style::new().dim();
+    let hint = format!("{} {}", prompt, dim.apply_to(placeholder));
     let value = Input::<String>::with_theme(&theme())
-        .with_prompt(prompt)
-        .default(default.to_string())
+        .with_prompt(hint)
+        .allow_empty(true)
         .interact_text()?;
     Ok(value)
 }
 
 /// Prompt for optional text input. Returns None if the user enters nothing.
+/// Shows placeholder hint in gray.
 pub fn input_optional(prompt: &str, placeholder: &str) -> anyhow::Result<Option<String>> {
-    let prompt_text = if placeholder.is_empty() {
-        prompt.to_string()
+    let value = if placeholder.is_empty() {
+        Input::<String>::with_theme(&theme())
+            .with_prompt(prompt)
+            .allow_empty(true)
+            .interact_text()?
     } else {
-        format!("{} ({})", prompt, placeholder)
+        let dim = Style::new().dim();
+        let hint = format!("{} {}", prompt, dim.apply_to(placeholder));
+        Input::<String>::with_theme(&theme())
+            .with_prompt(hint)
+            .allow_empty(true)
+            .interact_text()?
     };
-    let value = Input::<String>::with_theme(&theme())
-        .with_prompt(prompt_text)
-        .default(String::new())
-        .allow_empty(true)
-        .interact_text()?;
     if value.is_empty() {
         Ok(None)
     } else {
@@ -53,7 +72,7 @@ pub fn select(prompt: &str, items: &[String]) -> anyhow::Result<usize> {
 }
 
 /// Prompt for multi-selection from a list. Returns the selected indices.
-/// Active item is highlighted, checked items show green checkmark.
+/// Active item is highlighted, checked items show [✓].
 pub fn multi_select(
     prompt: &str,
     items: &[String],

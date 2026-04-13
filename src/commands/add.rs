@@ -178,7 +178,7 @@ fn select_group(pf: &mut config::ProjectsFile) -> Result<String> {
     if idx == options.len() - 1 {
         Ok(String::new())
     } else if idx == options.len() - 2 {
-        let group_name = ui::input(&t("group_name"), "")?;
+        let group_name = ui::input_with_placeholder(&t("group_name"), &t("placeholder_group_name"))?;
         if group_name.is_empty() {
             bail!("Group name cannot be empty");
         }

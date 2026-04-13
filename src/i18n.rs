@@ -138,6 +138,12 @@ fn en() -> HashMap<&'static str, &'static str> {
     m.insert("language_set", "Language set to: {}");
     m.insert("language_invalid", "Invalid language: '{}'. Valid options: en, zh");
 
+    // placeholders
+    m.insert("placeholder_workspace_name", "e.g. feature-login");
+    m.insert("placeholder_branch_name", "defaults to workspace name");
+    m.insert("placeholder_project_name", "e.g. my-project");
+    m.insert("placeholder_group_name", "e.g. frontend");
+
     m
 }
 
@@ -252,6 +258,12 @@ fn zh() -> HashMap<&'static str, &'static str> {
     // grove language
     m.insert("language_set", "语言已设置为: {}");
     m.insert("language_invalid", "无效的语言: '{}'。可选项: en, zh");
+
+    // placeholders
+    m.insert("placeholder_workspace_name", "例如 feature-login");
+    m.insert("placeholder_branch_name", "默认与工作区同名");
+    m.insert("placeholder_project_name", "例如 my-project");
+    m.insert("placeholder_group_name", "例如 frontend");
 
     m
 }

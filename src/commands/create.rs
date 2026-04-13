@@ -68,7 +68,7 @@ pub fn run(name: Option<String>) -> Result<()> {
     // 3. Get workspace name
     let ws_name = match name {
         Some(n) => n,
-        None => ui::input(&t("workspace_name"), "")?,
+        None => ui::input_with_placeholder(&t("workspace_name"), &t("placeholder_workspace_name"))?,
     };
 
     // 4. Validate name
