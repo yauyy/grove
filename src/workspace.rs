@@ -118,6 +118,7 @@ pub fn get_env_branch<'a>(project: &'a Project, env_name: &str) -> Option<&'a St
 }
 
 /// Resolve the worktree path for a workspace project.
+#[allow(dead_code)]
 pub fn resolve_worktree_path(workpath: &str, workspace_name: &str, project_name: &str) -> Result<PathBuf> {
     let base = config::resolve_workpath(workpath)?;
     Ok(base.join(workspace_name).join(project_name))
