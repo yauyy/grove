@@ -7,7 +7,7 @@ mod workspace;
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
-#[command(name = "grove", about = "Multi-project git worktree workspace manager")]
+#[command(name = "grove", version, about = "Multi-project git worktree workspace manager")]
 pub struct Cli {
     /// Edit a workspace configuration (interactive if name omitted)
     #[arg(short = 'w', long = "workspace")]
