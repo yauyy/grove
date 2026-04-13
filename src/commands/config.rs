@@ -1,12 +1,13 @@
-use anyhow::Result;
+use anyhow::{bail, Result};
 use std::fs;
+use std::process::Command;
 
 use crate::config as cfg;
 use crate::ui;
 
 pub fn set(key: &str, value: &str) -> Result<()> {
     if key != "workpath" {
-        anyhow::bail!("Unknown config key: '{}'. Valid keys: workpath", key);
+        bail!("Unknown config key: '{}'. Valid keys: workpath", key);
     }
 
     let mut config = cfg::load_global_config()?;
@@ -34,5 +35,78 @@ pub fn list() -> Result<()> {
         config.workpath,
         resolved.display()
     );
+    Ok(())
+}
+
+pub fn edit(file: Option<&str>) -> Result<()> {
+    let grove_dir = cfg::grove_dir()?;
+    cfg::ensure_dirs()?;
+
+    let filename = match file.unwrap_or("projects") {
+        "projects" => "projects.toml",
+        "config" => "config.toml",
+        "workspaces" => "workspaces.toml",
+        other => bail!(
+            "Unknown config file: '{}'. Valid options: projects, config, workspaces",
+            other
+        ),
+    };
+
+    let file_path = grove_dir.join(filename);
+
+    // Create file with defaults if it doesn't exist
+    if !file_path.exists() {
+        match filename {
+            "config.toml" => {
+                let config = cfg::GlobalConfig::default();
+                cfg::save_global_config(&config)?;
+            }
+            "projects.toml" => {
+                let pf = cfg::ProjectsFile::default();
+                cfg::save_projects(&pf)?;
+            }
+            "workspaces.toml" => {
+                let wf = cfg::WorkspacesFile::default();
+                cfg::save_workspaces(&wf)?;
+            }
+            _ => {}
+        }
+    }
+
+    // Find editor
+    let editor = std::env::var("EDITOR")
+        .or_else(|_| std::env::var("VISUAL"))
+        .unwrap_or_else(|_| {
+            if cfg!(target_os = "windows") {
+                "notepad".to_string()
+            } else {
+                // Try common editors
+                for cmd in &["vim", "nano", "vi"] {
+                    if Command::new("which")
+                        .arg(cmd)
+                        .output()
+                        .map(|o| o.status.success())
+                        .unwrap_or(false)
+                    {
+                        return cmd.to_string();
+                    }
+                }
+                "vi".to_string()
+            }
+        });
+
+    ui::info(&format!("Opening {} with {}", filename, editor));
+
+    let status = Command::new(&editor)
+        .arg(&file_path)
+        .status()
+        .map_err(|e| anyhow::anyhow!("Failed to open editor '{}': {}", editor, e))?;
+
+    if status.success() {
+        ui::success(&format!("{} edited successfully", filename));
+    } else {
+        ui::warn("Editor exited with non-zero status");
+    }
+
     Ok(())
 }

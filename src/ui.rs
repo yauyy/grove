@@ -1,9 +1,21 @@
 use console::Style;
+use dialoguer::theme::ColorfulTheme;
 use dialoguer::{Confirm, Input, MultiSelect, Select};
+
+/// Custom theme with highlighted active selection
+fn theme() -> ColorfulTheme {
+    ColorfulTheme {
+        active_item_style: Style::new().cyan().bold(),
+        active_item_prefix: console::style("❯ ".to_string()).cyan().bold(),
+        checked_item_prefix: console::style("✓ ".to_string()).green(),
+        unchecked_item_prefix: console::style("  ".to_string()),
+        ..ColorfulTheme::default()
+    }
+}
 
 /// Prompt for text input with a default value.
 pub fn input(prompt: &str, default: &str) -> anyhow::Result<String> {
-    let value = Input::<String>::new()
+    let value = Input::<String>::with_theme(&theme())
         .with_prompt(prompt)
         .default(default.to_string())
         .interact_text()?;
@@ -12,8 +24,13 @@ pub fn input(prompt: &str, default: &str) -> anyhow::Result<String> {
 
 /// Prompt for optional text input. Returns None if the user enters nothing.
 pub fn input_optional(prompt: &str, placeholder: &str) -> anyhow::Result<Option<String>> {
-    let value = Input::<String>::new()
-        .with_prompt(format!("{} ({})", prompt, placeholder))
+    let prompt_text = if placeholder.is_empty() {
+        prompt.to_string()
+    } else {
+        format!("{} ({})", prompt, placeholder)
+    };
+    let value = Input::<String>::with_theme(&theme())
+        .with_prompt(prompt_text)
         .default(String::new())
         .allow_empty(true)
         .interact_text()?;
@@ -25,21 +42,24 @@ pub fn input_optional(prompt: &str, placeholder: &str) -> anyhow::Result<Option<
 }
 
 /// Prompt for a single selection from a list. Returns the selected index.
+/// Active item is highlighted with cyan bold.
 pub fn select(prompt: &str, items: &[String]) -> anyhow::Result<usize> {
-    let idx = Select::new()
+    let idx = Select::with_theme(&theme())
         .with_prompt(prompt)
         .items(items)
+        .default(0)
         .interact()?;
     Ok(idx)
 }
 
 /// Prompt for multi-selection from a list. Returns the selected indices.
+/// Active item is highlighted, checked items show green checkmark.
 pub fn multi_select(
     prompt: &str,
     items: &[String],
     defaults: &[bool],
 ) -> anyhow::Result<Vec<usize>> {
-    let indices = MultiSelect::new()
+    let indices = MultiSelect::with_theme(&theme())
         .with_prompt(prompt)
         .items(items)
         .defaults(defaults)
@@ -49,7 +69,7 @@ pub fn multi_select(
 
 /// Prompt for a yes/no confirmation.
 pub fn confirm(prompt: &str, default: bool) -> anyhow::Result<bool> {
-    let result = Confirm::new()
+    let result = Confirm::with_theme(&theme())
         .with_prompt(prompt)
         .default(default)
         .interact()?;

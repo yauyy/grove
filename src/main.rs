@@ -129,6 +129,11 @@ enum ConfigCommands {
     },
     /// List all configuration values
     List,
+    /// Open a config file in your editor
+    Edit {
+        /// File to edit: projects, config, workspaces (default: projects)
+        file: Option<String>,
+    },
 }
 
 fn main() -> anyhow::Result<()> {
@@ -167,6 +172,7 @@ fn main() -> anyhow::Result<()> {
         Some(Commands::Config { action }) => match action {
             ConfigCommands::Set { ref key, ref value } => commands::config::set(key, value),
             ConfigCommands::List => commands::config::list(),
+            ConfigCommands::Edit { ref file } => commands::config::edit(file.as_deref()),
         },
         Some(Commands::Completion { ref shell }) => commands::completion::run(shell),
         None => {
