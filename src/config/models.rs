@@ -4,12 +4,30 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GlobalConfig {
     pub workpath: String,
+    #[serde(default = "default_language")]
+    pub language: String,
+}
+
+fn default_language() -> String {
+    // Detect from system locale
+    if let Ok(lang) = std::env::var("LANG") {
+        if lang.starts_with("zh") {
+            return "zh".to_string();
+        }
+    }
+    if let Ok(lang) = std::env::var("LC_ALL") {
+        if lang.starts_with("zh") {
+            return "zh".to_string();
+        }
+    }
+    "en".to_string()
 }
 
 impl Default for GlobalConfig {
     fn default() -> Self {
         Self {
             workpath: "~/grove-workspaces".to_string(),
+            language: default_language(),
         }
     }
 }
@@ -87,6 +105,7 @@ mod tests {
     fn test_global_config_roundtrip() {
         let config = GlobalConfig {
             workpath: "/tmp/my-workspaces".to_string(),
+            language: "en".to_string(),
         };
         let toml_str = toml::to_string(&config).unwrap();
         let parsed: GlobalConfig = toml::from_str(&toml_str).unwrap();

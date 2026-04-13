@@ -2,13 +2,13 @@ use console::Style;
 use dialoguer::theme::ColorfulTheme;
 use dialoguer::{Confirm, Input, MultiSelect, Select};
 
-/// Custom theme with highlighted active selection
+/// Custom theme with highlighted active selection and checkbox style
 fn theme() -> ColorfulTheme {
     ColorfulTheme {
         active_item_style: Style::new().cyan().bold(),
         active_item_prefix: console::style("❯ ".to_string()).cyan().bold(),
-        checked_item_prefix: console::style("✓ ".to_string()).green(),
-        unchecked_item_prefix: console::style("  ".to_string()),
+        checked_item_prefix: console::style("[✓] ".to_string()).green(),
+        unchecked_item_prefix: console::style("[ ] ".to_string()),
         ..ColorfulTheme::default()
     }
 }

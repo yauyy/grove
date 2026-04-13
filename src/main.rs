@@ -1,6 +1,7 @@
 mod commands;
 mod config;
 mod git;
+mod i18n;
 mod ui;
 mod workspace;
 
@@ -101,6 +102,18 @@ enum Commands {
         /// Shell to generate completions for (bash, zsh, fish, powershell)
         shell: String,
     },
+
+    /// Open a workspace in VS Code
+    Code {
+        /// Workspace name (interactive if omitted)
+        name: Option<String>,
+    },
+
+    /// Set display language (en/zh)
+    Language {
+        /// Language code: en or zh
+        lang: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -175,6 +188,8 @@ fn main() -> anyhow::Result<()> {
             ConfigCommands::Edit { ref file } => commands::config::edit(file.as_deref()),
         },
         Some(Commands::Completion { ref shell }) => commands::completion::run(shell),
+        Some(Commands::Code { ref name }) => commands::code::run(name.clone()),
+        Some(Commands::Language { ref lang }) => commands::language::run(lang),
         None => {
             // No command given, print help
             use clap::CommandFactory;

@@ -1,10 +1,12 @@
 pub mod add;
+pub mod code;
 pub mod completion;
 pub mod config;
 pub mod create;
 pub mod delete;
 pub mod git_ops;
 pub mod group;
+pub mod language;
 pub mod list;
 pub mod mov;
 pub mod remove;
