@@ -1,8 +1,18 @@
 [package]
-name = "grove"
+name = "grove-cli"
 version = "0.1.0"
 edition = "2021"
 description = "Multi-project git worktree workspace manager"
+license = "MIT"
+repository = "https://github.com/yauyy/grove"
+homepage = "https://github.com/yauyy/grove"
+keywords = ["git", "worktree", "workspace", "cli", "multi-repo"]
+categories = ["command-line-utilities", "development-tools"]
+readme = "README.md"
+
+[[bin]]
+name = "grove"
+path = "src/main.rs"
 
 [dependencies]
 clap = { version = "4", features = ["derive"] }
