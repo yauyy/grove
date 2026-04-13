@@ -1,6 +1,6 @@
 # Grove
 
-[English](#english) | **中文**
+**中文** | [English](#english)
 
 > 多项目 Git Worktree 工作区管理器
 
@@ -56,6 +56,7 @@ grove add /path/to/backend
 ```
 
 添加时会交互式引导你：
+
 - 选择分组（前端 / 后端 / 新建分组）
 - 选择远程主分支（如 origin/master）
 - 配置环境分支（测试 / 预发 / 正式，可选）
@@ -70,6 +71,7 @@ grove -c feature-login
 ```
 
 交互流程：
+
 1. 空格多选需要的项目 → 回车确认
 2. 输入分支名（默认同工作区名） → 回车
 3. 自动创建 worktree，基于远程主分支，`--no-track`
@@ -174,6 +176,7 @@ grove delete
 ```
 
 默认工作区路径：
+
 - macOS: `~/grove-workspaces`
 - Windows: `C:\Users\<user>\grove-workspaces`
 
