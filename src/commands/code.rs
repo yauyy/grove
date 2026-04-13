@@ -26,7 +26,7 @@ pub fn run(name: Option<String>) -> Result<()> {
     };
 
     let workpath = config::resolve_workpath(&global.workpath)?;
-    let ws_dir = workpath.join(&ws.name);
+    let ws_dir = workpath.join(config::safe_dir_name(&ws.name));
 
     if !ws_dir.exists() {
         bail!("Workspace directory does not exist: {}", ws_dir.display());

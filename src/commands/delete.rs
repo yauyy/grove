@@ -29,7 +29,7 @@ pub fn run() -> Result<()> {
     let ws = &workspaces_file.workspaces[ws_idx];
 
     let workpath = config::resolve_workpath(&global.workpath)?;
-    let ws_dir = workpath.join(&ws.name);
+    let ws_dir = workpath.join(config::safe_dir_name(&ws.name));
 
     // 4. Check each project for uncommitted changes
     let mut dirty_projects: Vec<String> = Vec::new();

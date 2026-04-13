@@ -14,7 +14,7 @@ pub fn detect_workspace(cwd: &Path) -> Result<Option<Workspace>> {
     let workpath = config::resolve_workpath(&global.workpath)?;
 
     for ws in &workspaces_file.workspaces {
-        let ws_dir = workpath.join(&ws.name);
+        let ws_dir = workpath.join(config::safe_dir_name(&ws.name));
         if cwd.starts_with(&ws_dir) {
             return Ok(Some(ws.clone()));
         }
