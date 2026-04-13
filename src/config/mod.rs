@@ -103,6 +103,17 @@ pub fn resolve_workpath(workpath: &str) -> Result<PathBuf> {
     }
 }
 
+/// Convert a name to a safe directory name.
+/// On macOS: '/' becomes ':' (Finder displays ':' as '/')
+/// On other platforms: '/' becomes '-'
+pub fn safe_dir_name(name: &str) -> String {
+    if cfg!(target_os = "macos") {
+        name.replace('/', ":")
+    } else {
+        name.replace('/', "-")
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

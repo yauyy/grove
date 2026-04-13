@@ -7,23 +7,32 @@ use crate::i18n::t;
 use crate::ui;
 
 pub fn set(key: &str, value: &str) -> Result<()> {
-    if key != "workpath" {
-        bail!("Unknown config key: '{}'. Valid keys: workpath", key);
-    }
-
     let mut config = cfg::load_global_config()?;
-    config.workpath = value.to_string();
 
-    // Auto-create the directory if it doesn't exist
-    let resolved = cfg::resolve_workpath(value)?;
-    if !resolved.exists() {
-        fs::create_dir_all(&resolved)?;
-        ui::info(&format!("Created directory: {}", resolved.display()));
+    match key {
+        "workpath" => {
+            config.workpath = value.to_string();
+
+            // Auto-create the directory if it doesn't exist
+            let resolved = cfg::resolve_workpath(value)?;
+            if !resolved.exists() {
+                fs::create_dir_all(&resolved)?;
+                ui::info(&format!("Created directory: {}", resolved.display()));
+            }
+
+            cfg::save_global_config(&config)?;
+            ui::success(&format!("workpath = {}", value));
+            ui::info(&t("workpath_forward_only"));
+        }
+        "git-prefix" => {
+            config.git_prefix = value.to_string();
+            cfg::save_global_config(&config)?;
+            ui::success(&format!("git-prefix = {}", value));
+        }
+        _ => {
+            bail!("Unknown config key: '{}'. Valid keys: workpath, git-prefix", key);
+        }
     }
-
-    cfg::save_global_config(&config)?;
-    ui::success(&format!("workpath = {}", value));
-    ui::info(&t("workpath_forward_only"));
 
     Ok(())
 }
@@ -36,6 +45,9 @@ pub fn list() -> Result<()> {
         config.workpath,
         resolved.display()
     );
+    if !config.git_prefix.is_empty() {
+        println!("git-prefix = {}", config.git_prefix);
+    }
     Ok(())
 }
 

@@ -91,12 +91,17 @@ pub fn run(name: Option<String>) -> Result<()> {
         return Ok(());
     }
 
-    // 7. Prompt for branch name
-    let branch = ui::input(&t("branch_name"), &ws_name)?;
+    // 7. Prompt for branch name (with git_prefix if configured)
+    let branch_default = if global.git_prefix.is_empty() {
+        ws_name.clone()
+    } else {
+        format!("{}{}", global.git_prefix, ws_name)
+    };
+    let branch = ui::input(&t("branch_name"), &branch_default)?;
 
     // 8. Create workspace directory
     let workpath = config::resolve_workpath(&global.workpath)?;
-    let ws_dir = workpath.join(&ws_name);
+    let ws_dir = workpath.join(config::safe_dir_name(&ws_name));
     fs::create_dir_all(&ws_dir)?;
 
     // 9. Process each selected project

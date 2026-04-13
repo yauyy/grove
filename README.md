@@ -128,6 +128,10 @@ grove language zh
 # 切换为英文界面
 grove language en
 
+# 设置 Git 分支前缀（创建工作区时分支名自动添加前缀）
+grove config set git-prefix feat-
+# 例如：工作区名 login → 分支名默认 feat-login
+
 # 直接编辑配置文件
 grove config edit           # 编辑 projects.toml
 grove config edit config    # 编辑 config.toml
@@ -180,6 +184,7 @@ grove config edit workspaces # 编辑 workspaces.toml
 | 命令 | 说明 |
 |------|------|
 | `grove config set workpath <path>` | 设置工作区根目录（仅影响新建工作区） |
+| `grove config set git-prefix <prefix>` | 设置 Git 分支前缀（如 `feat-`） |
 | `grove config list` | 查看当前配置 |
 | `grove config edit [file]` | 编辑配置文件（projects/config/workspaces） |
 | `grove code [name]` | 用 VS Code 打开工作区 |
@@ -192,10 +197,51 @@ grove config edit workspaces # 编辑 workspaces.toml
 
 ```
 ~/.grove/
-├── config.toml          # 全局配置（workpath, language）
+├── config.toml          # 全局配置
 ├── projects.toml        # 已注册项目
 ├── workspaces.toml      # 工作区记录
 └── agents/              # 各项目的 agents.md
+```
+
+### config.toml
+
+```toml
+workpath = "~/grove-workspaces"   # 工作区根目录
+language = "zh"                   # 界面语言（en / zh）
+git_prefix = "feat-"              # Git 分支前缀（可选，默认为空）
+```
+
+### projects.toml
+
+```toml
+[[groups]]
+name = "frontend"
+order = 0
+
+[[projects]]
+name = "web-app"
+path = "/Users/you/projects/web-app"
+group = "frontend"
+order = 0
+
+[projects.branches]
+main = "main"
+test = "develop"           # 可选
+staging = "staging"        # 可选
+prod = "production"        # 可选
+```
+
+### workspaces.toml
+
+```toml
+[[workspaces]]
+name = "login"
+branch = "feat-login"
+created_at = "2026-04-14"
+
+[[workspaces.projects]]
+name = "web-app"
+worktree_path = "/Users/you/grove-workspaces/login/web-app"
 ```
 
 默认工作区路径：
@@ -327,6 +373,11 @@ grove delete      # delete workspace + cleanup
 ```bash
 grove language zh           # switch to Chinese
 grove language en           # switch to English
+
+# Set git branch prefix (auto-prepended when creating workspaces)
+grove config set git-prefix feat-
+# e.g. workspace "login" → branch defaults to "feat-login"
+
 grove config edit           # edit projects.toml
 grove config edit config    # edit config.toml
 ```
@@ -353,9 +404,67 @@ grove config edit config    # edit config.toml
 | `grove gpull` | `gl` | Batch git pull |
 | `grove code [name]` | | Open workspace in VS Code |
 | `grove language <en/zh>` | | Set display language |
-| `grove config set/list` | | Configuration |
+| `grove config set/list` | | Configuration (workpath, git-prefix) |
 | `grove config edit [file]` | | Edit config file in editor |
 | `grove completion <shell>` | | Shell completions |
+
+## Config Files
+
+All configuration is stored in `~/.grove/`:
+
+```
+~/.grove/
+├── config.toml          # Global config
+├── projects.toml        # Registered projects
+├── workspaces.toml      # Workspace records
+└── agents/              # Per-project agents.md
+```
+
+### config.toml
+
+```toml
+workpath = "~/grove-workspaces"   # Workspace root directory
+language = "en"                   # UI language (en / zh)
+git_prefix = "feat-"              # Git branch prefix (optional, empty by default)
+```
+
+### projects.toml
+
+```toml
+[[groups]]
+name = "frontend"
+order = 0
+
+[[projects]]
+name = "web-app"
+path = "/Users/you/projects/web-app"
+group = "frontend"
+order = 0
+
+[projects.branches]
+main = "main"
+test = "develop"           # optional
+staging = "staging"        # optional
+prod = "production"        # optional
+```
+
+### workspaces.toml
+
+```toml
+[[workspaces]]
+name = "login"
+branch = "feat-login"
+created_at = "2026-04-14"
+
+[[workspaces.projects]]
+name = "web-app"
+worktree_path = "/Users/you/grove-workspaces/login/web-app"
+```
+
+Default workspace path:
+
+- macOS: `~/grove-workspaces`
+- Windows: `C:\Users\<user>\grove-workspaces`
 
 ## License
 

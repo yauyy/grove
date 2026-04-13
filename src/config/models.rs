@@ -6,6 +6,8 @@ pub struct GlobalConfig {
     pub workpath: String,
     #[serde(default = "default_language")]
     pub language: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub git_prefix: String,
 }
 
 fn default_language() -> String {
@@ -28,6 +30,7 @@ impl Default for GlobalConfig {
         Self {
             workpath: "~/grove-workspaces".to_string(),
             language: default_language(),
+            git_prefix: String::new(),
         }
     }
 }
@@ -106,6 +109,7 @@ mod tests {
         let config = GlobalConfig {
             workpath: "/tmp/my-workspaces".to_string(),
             language: "en".to_string(),
+            git_prefix: String::new(),
         };
         let toml_str = toml::to_string(&config).unwrap();
         let parsed: GlobalConfig = toml::from_str(&toml_str).unwrap();
