@@ -1,31 +1,244 @@
 use anyhow::Result;
+use console::Style;
+use std::path::Path;
 
-pub fn gmerge() -> Result<()> {
-    println!("gmerge: not yet implemented");
-    Ok(())
+use crate::config::{self, Project, Workspace, WorkspaceProject};
+use crate::git;
+use crate::ui;
+use crate::workspace;
+
+/// Resolved workspace context: the workspace plus matched (WorkspaceProject, Project) pairs.
+fn get_workspace_context() -> Result<(Workspace, Vec<(WorkspaceProject, Project)>)> {
+    let ws = workspace::get_or_select_workspace()?;
+    let projects_file = config::load_projects()?;
+
+    let mut matched = Vec::new();
+    for wp in &ws.projects {
+        if let Some(proj) = projects_file.projects.iter().find(|p| p.name == wp.name) {
+            matched.push((wp.clone(), proj.clone()));
+        }
+    }
+
+    Ok((ws, matched))
 }
 
 pub fn gstatus() -> Result<()> {
-    println!("gstatus: not yet implemented");
+    let (_ws, projects) = get_workspace_context()?;
+    let bold = Style::new().bold();
+
+    for (wp, _proj) in &projects {
+        println!("{}", bold.apply_to(&wp.name));
+        let wt_path = Path::new(&wp.worktree_path);
+        match git::status_short(wt_path) {
+            Ok(output) => {
+                if output.is_empty() {
+                    println!("  Working tree clean");
+                } else {
+                    for line in output.lines() {
+                        println!("  {}", line);
+                    }
+                }
+            }
+            Err(e) => {
+                ui::error(&format!("  {}: {}", wp.name, e));
+            }
+        }
+    }
+
     Ok(())
 }
 
 pub fn gadd() -> Result<()> {
-    println!("gadd: not yet implemented");
+    let (_ws, projects) = get_workspace_context()?;
+    let mut succeeded = 0usize;
+    let mut failed = 0usize;
+
+    for (wp, _proj) in &projects {
+        let wt_path = Path::new(&wp.worktree_path);
+        match git::add_all(wt_path) {
+            Ok(()) => {
+                ui::success(&format!("{}: staged all changes", wp.name));
+                succeeded += 1;
+            }
+            Err(e) => {
+                ui::error(&format!("{}: {}", wp.name, e));
+                failed += 1;
+            }
+        }
+    }
+
+    ui::batch_summary(succeeded, failed);
     Ok(())
 }
 
 pub fn gcommit() -> Result<()> {
-    println!("gcommit: not yet implemented");
+    let (_ws, projects) = get_workspace_context()?;
+    let message = ui::input("Commit message", "")?;
+    if message.is_empty() {
+        anyhow::bail!("Commit message cannot be empty");
+    }
+
+    let mut succeeded = 0usize;
+    let mut failed = 0usize;
+
+    for (wp, _proj) in &projects {
+        let wt_path = Path::new(&wp.worktree_path);
+        // Check if there is anything staged
+        match git::status_short(wt_path) {
+            Ok(status) => {
+                if status.is_empty() {
+                    ui::info(&format!("{}: nothing to commit", wp.name));
+                    continue;
+                }
+                match git::commit(wt_path, &message) {
+                    Ok(()) => {
+                        ui::success(&format!("{}: committed", wp.name));
+                        succeeded += 1;
+                    }
+                    Err(e) => {
+                        ui::error(&format!("{}: {}", wp.name, e));
+                        failed += 1;
+                    }
+                }
+            }
+            Err(e) => {
+                ui::error(&format!("{}: {}", wp.name, e));
+                failed += 1;
+            }
+        }
+    }
+
+    ui::batch_summary(succeeded, failed);
     Ok(())
 }
 
 pub fn gpush() -> Result<()> {
-    println!("gpush: not yet implemented");
+    let (ws, projects) = get_workspace_context()?;
+    let mut succeeded = 0usize;
+    let mut failed = 0usize;
+
+    for (wp, _proj) in &projects {
+        let wt_path = Path::new(&wp.worktree_path);
+        match git::push_upstream(wt_path, &ws.branch) {
+            Ok(()) => {
+                ui::success(&format!("{}: pushed to origin/{}", wp.name, ws.branch));
+                succeeded += 1;
+            }
+            Err(e) => {
+                ui::error(&format!("{}: {}", wp.name, e));
+                failed += 1;
+            }
+        }
+    }
+
+    ui::batch_summary(succeeded, failed);
     Ok(())
 }
 
 pub fn gpull() -> Result<()> {
-    println!("gpull: not yet implemented");
+    let (_ws, projects) = get_workspace_context()?;
+    let mut succeeded = 0usize;
+    let mut failed = 0usize;
+
+    for (wp, _proj) in &projects {
+        let wt_path = Path::new(&wp.worktree_path);
+        match git::pull(wt_path) {
+            Ok(()) => {
+                ui::success(&format!("{}: pulled", wp.name));
+                succeeded += 1;
+            }
+            Err(e) => {
+                ui::error(&format!("{}: {}", wp.name, e));
+                failed += 1;
+            }
+        }
+    }
+
+    ui::batch_summary(succeeded, failed);
+    Ok(())
+}
+
+pub fn gmerge() -> Result<()> {
+    let (ws, projects) = get_workspace_context()?;
+    let projects_file = config::load_projects()?;
+
+    // Collect project names for common_environments
+    let project_names: Vec<String> = projects.iter().map(|(wp, _)| wp.name.clone()).collect();
+    let envs = workspace::common_environments(&projects_file, &project_names);
+
+    if envs.is_empty() {
+        ui::error("No common environments across workspace projects.");
+        // Show which projects are missing which environments
+        let env_names = ["test", "staging", "prod"];
+        for env_name in &env_names {
+            let missing: Vec<&str> = projects
+                .iter()
+                .filter(|(_, proj)| workspace::get_env_branch(proj, env_name).is_none())
+                .map(|(wp, _)| wp.name.as_str())
+                .collect();
+            if !missing.is_empty() {
+                ui::warn(&format!(
+                    "{}: missing in {}",
+                    env_name,
+                    missing.join(", ")
+                ));
+            }
+        }
+        anyhow::bail!("Cannot merge without common environments");
+    }
+
+    let env_names: Vec<String> = envs.clone();
+    let idx = ui::select("Select target environment", &env_names)?;
+    let target_env = &envs[idx];
+
+    let mut succeeded = 0usize;
+    let mut failed = 0usize;
+
+    for (wp, proj) in &projects {
+        let wt_path = Path::new(&wp.worktree_path);
+        let env_branch_remote = match workspace::get_env_branch(proj, target_env) {
+            Some(b) => b.clone(),
+            None => {
+                ui::error(&format!("{}: no {} branch configured", wp.name, target_env));
+                failed += 1;
+                continue;
+            }
+        };
+
+        // Determine local branch name (strip "origin/" prefix if present)
+        let local_env_branch = env_branch_remote
+            .strip_prefix("origin/")
+            .unwrap_or(&env_branch_remote)
+            .to_string();
+
+        let work_branch = ws.branch.clone();
+
+        // Perform fetch, checkout env branch, merge work branch, checkout back
+        let result = (|| -> Result<()> {
+            git::fetch(wt_path)?;
+            git::checkout(wt_path, &local_env_branch)?;
+            git::merge(wt_path, &work_branch)?;
+            git::checkout(wt_path, &work_branch)?;
+            Ok(())
+        })();
+
+        match result {
+            Ok(()) => {
+                ui::success(&format!(
+                    "{}: merged {} into {}",
+                    wp.name, work_branch, local_env_branch
+                ));
+                succeeded += 1;
+            }
+            Err(e) => {
+                ui::error(&format!("{}: {}", wp.name, e));
+                // Try to checkout back to work branch on failure
+                let _ = git::checkout(wt_path, &work_branch);
+                failed += 1;
+            }
+        }
+    }
+
+    ui::batch_summary(succeeded, failed);
     Ok(())
 }
