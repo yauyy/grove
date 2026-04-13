@@ -3,6 +3,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::config::{self, Project, ProjectsFile, Workspace};
+use crate::i18n::t;
 use crate::ui;
 
 /// Detect if the current working directory is inside a workspace.
@@ -33,7 +34,7 @@ pub fn get_or_select_workspace() -> Result<Workspace> {
     // Fall back to prompting the user
     let workspaces_file = config::load_workspaces()?;
     if workspaces_file.workspaces.is_empty() {
-        anyhow::bail!("No workspaces found. Create one first with `grove create`.");
+        anyhow::bail!("{}", t("no_workspaces_found"));
     }
 
     let names: Vec<String> = workspaces_file
@@ -41,7 +42,7 @@ pub fn get_or_select_workspace() -> Result<Workspace> {
         .iter()
         .map(|ws| ws.name.clone())
         .collect();
-    let idx = ui::select("Select workspace", &names)?;
+    let idx = ui::select(&t("select_workspace"), &names)?;
     Ok(workspaces_file.workspaces[idx].clone())
 }
 

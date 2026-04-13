@@ -4,6 +4,7 @@ use std::path::Path;
 use crate::commands::create::build_grouped_project_list;
 use crate::config::{self, WorkspaceProject};
 use crate::git;
+use crate::i18n::t;
 use crate::ui;
 use crate::workspace;
 
@@ -15,7 +16,7 @@ pub fn run(name: Option<String>) -> Result<()> {
 
     // 2. Check we have workspaces
     if workspaces_file.workspaces.is_empty() {
-        ui::info("No workspaces found. Create one first with `grove create`.");
+        ui::info(&t("no_workspaces_edit"));
         return Ok(());
     }
 
@@ -34,7 +35,7 @@ pub fn run(name: Option<String>) -> Result<()> {
                 .iter()
                 .map(|ws| ws.name.clone())
                 .collect();
-            ui::select("Select workspace to edit", &ws_names)?
+            ui::select(&t("select_workspace_edit"), &ws_names)?
         }
     };
 
@@ -54,7 +55,7 @@ pub fn run(name: Option<String>) -> Result<()> {
         .collect();
 
     // 6. Show multi_select with defaults
-    let selected = ui::multi_select("Select projects", &display_items, &defaults)?;
+    let selected = ui::multi_select(&t("edit_projects"), &display_items, &defaults)?;
 
     // 7. Compute additions and removals
     let new_project_names: Vec<String> = selected
@@ -79,7 +80,7 @@ pub fn run(name: Option<String>) -> Result<()> {
 
     // 8. If no changes, print info and return
     if additions.is_empty() && removals.is_empty() {
-        ui::info("No changes to workspace.");
+        ui::info(&t("no_changes"));
         return Ok(());
     }
 
@@ -94,8 +95,8 @@ pub fn run(name: Option<String>) -> Result<()> {
         if wt_path.exists() {
             if let Ok(false) = git::is_clean(&wt_path) {
                 bail!(
-                    "Project '{}' has uncommitted changes. Commit or stash them first.",
-                    removal
+                    "{}",
+                    t("uncommitted_changes").replace("{}", removal)
                 );
             }
         }

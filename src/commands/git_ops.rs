@@ -4,6 +4,7 @@ use std::path::Path;
 
 use crate::config::{self, Project, Workspace, WorkspaceProject};
 use crate::git;
+use crate::i18n::t;
 use crate::ui;
 use crate::workspace;
 
@@ -73,7 +74,7 @@ pub fn gadd() -> Result<()> {
 
 pub fn gcommit() -> Result<()> {
     let (_ws, projects) = get_workspace_context()?;
-    let message = ui::input("Commit message", "")?;
+    let message = ui::input(&t("commit_message"), "")?;
     if message.is_empty() {
         anyhow::bail!("Commit message cannot be empty");
     }
@@ -87,7 +88,7 @@ pub fn gcommit() -> Result<()> {
         match git::status_short(wt_path) {
             Ok(status) => {
                 if status.is_empty() {
-                    ui::info(&format!("{}: nothing to commit", wp.name));
+                    ui::info(&t("nothing_to_commit").replace("{}", &wp.name));
                     continue;
                 }
                 match git::commit(wt_path, &message) {
@@ -167,7 +168,7 @@ pub fn gmerge() -> Result<()> {
     let envs = workspace::common_environments(&projects_file, &project_names);
 
     if envs.is_empty() {
-        ui::error("No common environments across workspace projects.");
+        ui::error(&t("no_common_env"));
         // Show which projects are missing which environments
         let env_names = ["test", "staging", "prod"];
         for env_name in &env_names {
@@ -188,7 +189,7 @@ pub fn gmerge() -> Result<()> {
     }
 
     let env_names: Vec<String> = envs.clone();
-    let idx = ui::select("Select target environment", &env_names)?;
+    let idx = ui::select(&t("merge_to_env"), &env_names)?;
     let target_env = &envs[idx];
 
     let mut succeeded = 0usize;

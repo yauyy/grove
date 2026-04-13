@@ -2,12 +2,13 @@ use anyhow::Result;
 use console::Style;
 
 use crate::config;
+use crate::i18n::t;
 
 pub fn run() -> Result<()> {
     let pf = config::load_projects()?;
 
     if pf.projects.is_empty() {
-        println!("No projects registered. Use `grove add <path>` to add one.");
+        println!("{}", t("no_projects"));
         return Ok(());
     }
 
@@ -48,7 +49,7 @@ pub fn run() -> Result<()> {
         .collect();
 
     if !ungrouped.is_empty() {
-        println!("{}", bold.apply_to("Ungrouped"));
+        println!("{}", bold.apply_to(t("ungrouped")));
         let mut sorted_ungrouped = ungrouped;
         sorted_ungrouped.sort_by_key(|p| p.order);
 

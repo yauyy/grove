@@ -3,6 +3,7 @@ use std::fs;
 use std::process::Command;
 
 use crate::config as cfg;
+use crate::i18n::t;
 use crate::ui;
 
 pub fn set(key: &str, value: &str) -> Result<()> {
@@ -22,7 +23,7 @@ pub fn set(key: &str, value: &str) -> Result<()> {
 
     cfg::save_global_config(&config)?;
     ui::success(&format!("workpath = {}", value));
-    ui::info("Note: changing workpath is forward-only. Existing workspaces remain at their original location.");
+    ui::info(&t("workpath_forward_only"));
 
     Ok(())
 }
@@ -95,7 +96,9 @@ pub fn edit(file: Option<&str>) -> Result<()> {
             }
         });
 
-    ui::info(&format!("Opening {} with {}", filename, editor));
+    ui::info(&t("config_edit_opening")
+        .replacen("{}", filename, 1)
+        .replacen("{}", &editor, 1));
 
     let status = Command::new(&editor)
         .arg(&file_path)
@@ -103,7 +106,7 @@ pub fn edit(file: Option<&str>) -> Result<()> {
         .map_err(|e| anyhow::anyhow!("Failed to open editor '{}': {}", editor, e))?;
 
     if status.success() {
-        ui::success(&format!("{} edited successfully", filename));
+        ui::success(&t("config_edited").replace("{}", filename));
     } else {
         ui::warn("Editor exited with non-zero status");
     }

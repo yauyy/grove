@@ -3,20 +3,21 @@ use std::path::PathBuf;
 
 use crate::config::{self, BranchConfig, Group, Project};
 use crate::git;
+use crate::i18n::t;
 use crate::ui;
 
 pub fn run(path: &str) -> Result<()> {
     // 1. Resolve and validate the path
     let resolved = PathBuf::from(path)
         .canonicalize()
-        .map_err(|_| anyhow::anyhow!("Path does not exist: {}", path))?;
+        .map_err(|_| anyhow::anyhow!("{}", t("path_not_exist").replace("{}", path)))?;
 
     if !resolved.is_dir() {
         bail!("Path is not a directory: {}", resolved.display());
     }
 
     if !git::is_git_repo(&resolved) {
-        bail!("Not a git repository: {}", resolved.display());
+        bail!("{}", t("not_git_repo").replace("{}", &resolved.to_string_lossy()));
     }
 
     let path_str = resolved.to_string_lossy().to_string();
@@ -24,7 +25,7 @@ pub fn run(path: &str) -> Result<()> {
     // 2. Check if already registered
     let mut pf = config::load_projects()?;
     if pf.projects.iter().any(|p| p.path == path_str) {
-        bail!("Project already registered: {}", path_str);
+        bail!("{}", t("project_already_registered").replace("{}", &path_str));
     }
 
     // 3. Auto-detect project name from directory name, let user modify
@@ -33,18 +34,18 @@ pub fn run(path: &str) -> Result<()> {
         .map(|n| n.to_string_lossy().to_string())
         .unwrap_or_else(|| "project".to_string());
 
-    let name = ui::input("Project name", &dir_name)?;
+    let name = ui::input(&t("project_name"), &dir_name)?;
 
     // Check for duplicate name
     if pf.projects.iter().any(|p| p.name == name) {
-        bail!("A project named '{}' already exists", name);
+        bail!("{}", t("project_name_exists").replace("{}", &name));
     }
 
     // 4. Select group
     let group = select_group(&mut pf)?;
 
     // 5. Fetch remote (best effort) to validate branches later
-    ui::info("Fetching remote branches...");
+    ui::info(&t("fetching_remote"));
     let _ = git::fetch(&resolved);
 
     let remote_branches = git::list_remote_branches(&resolved).unwrap_or_default();
@@ -56,7 +57,7 @@ pub fn run(path: &str) -> Result<()> {
     // 6. Main branch - direct input + validation
     let current = git::current_branch(&resolved).unwrap_or_else(|_| "main".to_string());
     let main_branch = input_branch_with_validation(
-        "Main branch",
+        &t("main_branch"),
         &current,
         &clean_branches,
         true,
@@ -64,32 +65,32 @@ pub fn run(path: &str) -> Result<()> {
 
     // 7. Environment branches - direct input + validation (optional)
     let test_branch = input_branch_with_validation(
-        "Test branch (leave empty to skip)",
+        &t("test_branch"),
         "",
         &clean_branches,
         false,
     )?;
     let staging_branch = input_branch_with_validation(
-        "Staging branch (leave empty to skip)",
+        &t("staging_branch"),
         "",
         &clean_branches,
         false,
     )?;
     let prod_branch = input_branch_with_validation(
-        "Prod branch (leave empty to skip)",
+        &t("prod_branch"),
         "",
         &clean_branches,
         false,
     )?;
 
     // 8. Optional agents.md configuration
-    let agents_md = ui::input_optional("Path to agents.md", "press Enter to skip")?;
+    let agents_md = ui::input_optional(&t("agents_md_path"), &t("press_enter_skip"))?;
 
     if let Some(ref md_path) = agents_md {
         let md_resolved = PathBuf::from(md_path);
         if !md_resolved.exists() {
             ui::warn(&format!("agents.md not found at: {}", md_path));
-            if !ui::confirm("Continue anyway?", false)? {
+            if !ui::confirm(&t("continue_anyway"), false)? {
                 bail!("Aborted");
             }
         }
@@ -122,7 +123,7 @@ pub fn run(path: &str) -> Result<()> {
     pf.projects.push(project);
     config::save_projects(&pf)?;
 
-    ui::success(&format!("Added project '{}'", name));
+    ui::success(&t("project_added").replace("{}", &name));
     Ok(())
 }
 
@@ -144,19 +145,19 @@ fn input_branch_with_validation(
 
         if value.is_empty() {
             if required {
-                ui::error("This field is required.");
+                ui::error(&t("field_required"));
                 continue;
             }
-            ui::info("Skipped");
+            ui::info(&t("skipped"));
             return Ok(None);
         }
 
         // Validate: check if origin/<branch> exists in remote
         if remote_branches.contains(&value) {
-            ui::success(&format!("origin/{} exists", value));
+            ui::success(&t("branch_exists").replace("{}", &value));
         } else if !remote_branches.is_empty() {
-            ui::warn(&format!("origin/{} not found on remote", value));
-            if !ui::confirm("Continue with this branch anyway?", true)? {
+            ui::warn(&t("branch_not_found").replace("{}", &value));
+            if !ui::confirm(&t("continue_branch"), true)? {
                 continue;
             }
         }
@@ -169,20 +170,20 @@ fn input_branch_with_validation(
 /// Prompt user to select a group from existing groups, create a new one, or choose ungrouped.
 fn select_group(pf: &mut config::ProjectsFile) -> Result<String> {
     let mut options: Vec<String> = pf.groups.iter().map(|g| g.name.clone()).collect();
-    options.push("+ New group".to_string());
-    options.push("Ungrouped".to_string());
+    options.push(t("new_group"));
+    options.push(t("ungrouped"));
 
-    let idx = ui::select("Select group", &options)?;
+    let idx = ui::select(&t("select_group"), &options)?;
 
     if idx == options.len() - 1 {
         Ok(String::new())
     } else if idx == options.len() - 2 {
-        let group_name = ui::input("Group name", "")?;
+        let group_name = ui::input(&t("group_name"), "")?;
         if group_name.is_empty() {
             bail!("Group name cannot be empty");
         }
         if pf.groups.iter().any(|g| g.name == group_name) {
-            bail!("Group '{}' already exists", group_name);
+            bail!("{}", t("group_exists").replace("{}", &group_name));
         }
         let order = pf.groups.iter().map(|g| g.order).max().map(|m| m + 1).unwrap_or(0);
         pf.groups.push(Group {

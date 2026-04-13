@@ -1,13 +1,14 @@
 use anyhow::Result;
 
 use crate::config;
+use crate::i18n::t;
 use crate::ui;
 
 pub fn run() -> Result<()> {
     let mut pf = config::load_projects()?;
 
     if pf.projects.is_empty() {
-        ui::info("No projects registered.");
+        ui::info(&t("no_projects"));
         return Ok(());
     }
 
@@ -24,7 +25,7 @@ pub fn run() -> Result<()> {
         })
         .collect();
 
-    let idx = ui::select("Select project to remove", &display_names)?;
+    let idx = ui::select(&t("select_project_remove"), &display_names)?;
     let project_name = pf.projects[idx].name.clone();
 
     // Check if project is in any workspace
@@ -37,13 +38,11 @@ pub fn run() -> Result<()> {
         .collect();
 
     if !in_workspaces.is_empty() {
-        ui::warn(&format!(
-            "Project '{}' is used in workspace(s): {}",
-            project_name,
-            in_workspaces.join(", ")
-        ));
-        if !ui::confirm("Remove anyway?", false)? {
-            ui::info("Cancelled.");
+        ui::warn(&t("project_in_workspaces")
+            .replacen("{}", &project_name, 1)
+            .replacen("{}", &in_workspaces.join(", "), 1));
+        if !ui::confirm(&t("remove_anyway"), false)? {
+            ui::info(&t("cancelled"));
             return Ok(());
         }
     }
@@ -51,6 +50,6 @@ pub fn run() -> Result<()> {
     pf.projects.remove(idx);
     config::save_projects(&pf)?;
 
-    ui::success(&format!("Removed project '{}'", project_name));
+    ui::success(&t("project_removed").replace("{}", &project_name));
     Ok(())
 }

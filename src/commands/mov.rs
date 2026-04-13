@@ -1,13 +1,14 @@
 use anyhow::Result;
 
 use crate::config;
+use crate::i18n::t;
 use crate::ui;
 
 pub fn run(project: Option<String>) -> Result<()> {
     let mut pf = config::load_projects()?;
 
     if pf.projects.is_empty() {
-        ui::info("No projects registered.");
+        ui::info(&t("no_projects"));
         return Ok(());
     }
 
@@ -31,7 +32,7 @@ pub fn run(project: Option<String>) -> Result<()> {
                     }
                 })
                 .collect();
-            ui::select("Select project to move", &names)?
+            ui::select(&t("select_project_move"), &names)?
         }
     };
 
@@ -40,9 +41,9 @@ pub fn run(project: Option<String>) -> Result<()> {
 
     // 2. Show target group options
     let mut options: Vec<String> = pf.groups.iter().map(|g| g.name.clone()).collect();
-    options.push("Ungrouped".to_string());
+    options.push(t("ungrouped"));
 
-    let target_idx = ui::select("Select target group", &options)?;
+    let target_idx = ui::select(&t("move_to_group"), &options)?;
 
     let new_group = if target_idx == options.len() - 1 {
         String::new() // Ungrouped
@@ -72,10 +73,12 @@ pub fn run(project: Option<String>) -> Result<()> {
     config::save_projects(&pf)?;
 
     let display_group = if new_group.is_empty() {
-        "Ungrouped".to_string()
+        t("ungrouped")
     } else {
         new_group
     };
-    ui::success(&format!("Moved '{}' to '{}'", project_name, display_group));
+    ui::success(&t("project_moved")
+        .replacen("{}", &project_name, 1)
+        .replacen("{}", &display_group, 1));
     Ok(())
 }

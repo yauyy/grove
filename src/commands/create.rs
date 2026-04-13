@@ -4,6 +4,7 @@ use std::path::Path;
 
 use crate::config::{self, ProjectsFile, Workspace, WorkspaceProject};
 use crate::git;
+use crate::i18n::t;
 use crate::ui;
 use crate::workspace;
 
@@ -60,14 +61,14 @@ pub fn run(name: Option<String>) -> Result<()> {
 
     // 2. Check we have projects
     if projects_file.projects.is_empty() {
-        ui::info("No projects registered. Use `grove add <path>` to add one first.");
+        ui::info(&t("no_projects_registered"));
         return Ok(());
     }
 
     // 3. Get workspace name
     let ws_name = match name {
         Some(n) => n,
-        None => ui::input("Workspace name", "")?,
+        None => ui::input(&t("workspace_name"), "")?,
     };
 
     // 4. Validate name
@@ -76,22 +77,22 @@ pub fn run(name: Option<String>) -> Result<()> {
     }
 
     if workspaces_file.workspaces.iter().any(|ws| ws.name == ws_name) {
-        bail!("Workspace '{}' already exists", ws_name);
+        bail!("{}", t("workspace_exists").replace("{}", &ws_name));
     }
 
     // 5. Multi-select projects
     let (display_items, index_map) = build_grouped_project_list(&projects_file);
     let defaults: Vec<bool> = vec![false; display_items.len()];
-    let selected = ui::multi_select("Select projects", &display_items, &defaults)?;
+    let selected = ui::multi_select(&t("select_projects"), &display_items, &defaults)?;
 
     // 6. Bail if none selected
     if selected.is_empty() {
-        ui::info("No projects selected.");
+        ui::info(&t("no_projects_selected"));
         return Ok(());
     }
 
     // 7. Prompt for branch name
-    let branch = ui::input("Branch name", &ws_name)?;
+    let branch = ui::input(&t("branch_name"), &ws_name)?;
 
     // 8. Create workspace directory
     let workpath = config::resolve_workpath(&global.workpath)?;
@@ -166,7 +167,7 @@ pub fn run(name: Option<String>) -> Result<()> {
 
     // 12. Print summary
     println!();
-    ui::header(&format!("Workspace '{}' created", ws_name));
+    ui::header(&t("workspace_created").replace("{}", &ws_name));
     ui::batch_summary(succeeded, failed);
 
     Ok(())

@@ -4,6 +4,7 @@ use std::path::Path;
 
 use crate::config;
 use crate::git;
+use crate::i18n::t;
 use crate::ui;
 
 pub fn run() -> Result<()> {
@@ -14,7 +15,7 @@ pub fn run() -> Result<()> {
 
     // 2. Check we have workspaces
     if workspaces_file.workspaces.is_empty() {
-        ui::info("No workspaces found. Create one first with `grove create`.");
+        ui::info(&t("no_workspaces"));
         return Ok(());
     }
 
@@ -24,7 +25,7 @@ pub fn run() -> Result<()> {
         .iter()
         .map(|ws| ws.name.clone())
         .collect();
-    let ws_idx = ui::select("Select workspace to delete", &ws_names)?;
+    let ws_idx = ui::select(&t("select_workspace_delete"), &ws_names)?;
     let ws = &workspaces_file.workspaces[ws_idx];
 
     let workpath = config::resolve_workpath(&global.workpath)?;
@@ -47,7 +48,7 @@ pub fn run() -> Result<()> {
             "The following projects have uncommitted changes: {}",
             dirty_projects.join(", ")
         ));
-        if !ui::confirm("Continue with deletion? Changes will be lost.", false)? {
+        if !ui::confirm(&t("delete_with_changes"), false)? {
             ui::info("Aborted.");
             return Ok(());
         }
@@ -93,6 +94,6 @@ pub fn run() -> Result<()> {
     config::save_workspaces(&workspaces_file)?;
 
     // 9. Print success
-    ui::success(&format!("Deleted workspace '{}'", ws_name));
+    ui::success(&t("workspace_deleted").replace("{}", &ws_name));
     Ok(())
 }

@@ -4,6 +4,7 @@ use std::path::Path;
 
 use crate::config;
 use crate::git;
+use crate::i18n::t;
 
 pub fn run() -> Result<()> {
     // 1. Load workspaces
@@ -11,7 +12,7 @@ pub fn run() -> Result<()> {
 
     // 2. If empty, print message
     if workspaces_file.workspaces.is_empty() {
-        println!("No workspaces. Create one with `grove create`.");
+        println!("{}", t("no_workspaces_status"));
         return Ok(());
     }
 
@@ -34,17 +35,17 @@ pub fn run() -> Result<()> {
             let wt_path = Path::new(&wp.worktree_path);
 
             let status_str = if !wt_path.exists() {
-                "missing".to_string()
+                t("missing")
             } else {
                 match git::status_short(wt_path) {
                     Ok(output) => {
                         if output.is_empty() {
-                            format!("{}", green.apply_to("clean"))
+                            format!("{}", green.apply_to(t("clean")))
                         } else {
                             let change_count = output.lines().count();
                             format!(
                                 "{}",
-                                yellow.apply_to(format!("{} changes", change_count))
+                                yellow.apply_to(t("changes").replace("{}", &change_count.to_string()))
                             )
                         }
                     }

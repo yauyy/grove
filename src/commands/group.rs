@@ -1,6 +1,7 @@
 use anyhow::{bail, Result};
 
 use crate::config::{self, Group};
+use crate::i18n::t;
 use crate::ui;
 
 /// Add a new group.
@@ -9,7 +10,7 @@ pub fn add(name: &str) -> Result<()> {
 
     // Check for duplicate
     if pf.groups.iter().any(|g| g.name == name) {
-        bail!("Group '{}' already exists", name);
+        bail!("{}", t("group_exists").replace("{}", name));
     }
 
     let order = pf
@@ -26,7 +27,7 @@ pub fn add(name: &str) -> Result<()> {
     });
 
     config::save_projects(&pf)?;
-    ui::success(&format!("Added group '{}'", name));
+    ui::success(&t("group_created").replace("{}", name));
     Ok(())
 }
 
@@ -35,12 +36,12 @@ pub fn remove() -> Result<()> {
     let mut pf = config::load_projects()?;
 
     if pf.groups.is_empty() {
-        ui::info("No groups defined.");
+        ui::info(&t("no_groups"));
         return Ok(());
     }
 
     let group_names: Vec<String> = pf.groups.iter().map(|g| g.name.clone()).collect();
-    let idx = ui::select("Select group to remove", &group_names)?;
+    let idx = ui::select(&t("select_group_remove"), &group_names)?;
     let group_name = group_names[idx].clone();
 
     // Move projects in this group to ungrouped
@@ -59,12 +60,9 @@ pub fn remove() -> Result<()> {
     config::save_projects(&pf)?;
 
     if moved_count > 0 {
-        ui::info(&format!(
-            "Moved {} project(s) to ungrouped",
-            moved_count
-        ));
+        ui::info(&t("projects_become_ungrouped").replace("{}", &moved_count.to_string()));
     }
-    ui::success(&format!("Removed group '{}'", group_name));
+    ui::success(&t("group_removed").replace("{}", &group_name));
     Ok(())
 }
 
@@ -90,7 +88,7 @@ pub fn list() -> Result<()> {
         let dim = console::Style::new().dim();
         println!(
             "  {} ({} project{})",
-            dim.apply_to("Ungrouped"),
+            dim.apply_to(t("ungrouped")),
             ungrouped_count,
             if ungrouped_count == 1 { "" } else { "s" }
         );
@@ -116,7 +114,7 @@ pub fn reorder() -> Result<()> {
     pf.groups.sort_by_key(|g| g.order);
 
     let group_names: Vec<String> = pf.groups.iter().map(|g| g.name.clone()).collect();
-    let idx = ui::select("Select group to move", &group_names)?;
+    let idx = ui::select(&t("move_which_group"), &group_names)?;
 
     // Build position options
     let positions: Vec<String> = (1..=pf.groups.len())
@@ -129,7 +127,7 @@ pub fn reorder() -> Result<()> {
         })
         .collect();
 
-    let new_pos = ui::select("Select new position", &positions)?;
+    let new_pos = ui::select(&t("move_to_position"), &positions)?;
 
     if new_pos == idx {
         ui::info("Position unchanged.");
@@ -146,6 +144,6 @@ pub fn reorder() -> Result<()> {
     }
 
     config::save_projects(&pf)?;
-    ui::success("Groups reordered.");
+    ui::success(&t("groups_reordered"));
     Ok(())
 }
