@@ -97,7 +97,12 @@ pub fn run(name: Option<String>) -> Result<()> {
     } else {
         format!("{}{}", global.git_prefix, ws_name)
     };
-    let branch = ui::input(&t("branch_name"), &branch_default)?;
+    let input = ui::input(&t("branch_name"), &branch_default)?;
+    let branch = if !global.git_prefix.is_empty() && !input.starts_with(&global.git_prefix) {
+        format!("{}{}", global.git_prefix, input)
+    } else {
+        input
+    };
 
     // 8. Create workspace directory
     let workpath = config::resolve_workpath(&global.workpath)?;

@@ -44,7 +44,18 @@ pub fn run(path: &str) -> Result<()> {
     // 4. Select group
     let group = select_group(&mut pf)?;
 
-    // 5. Fetch remote (best effort) to validate branches later
+    // 5. Main branch - direct input (required)
+    let main_branch = ui::input(&t("main_branch"), "master")?;
+    if main_branch.is_empty() {
+        bail!("{}", t("field_required"));
+    }
+
+    // 6. Environment branches - direct input (optional)
+    let test_branch = ui::input_optional(&t("test_branch"), "")?.filter(|s| !s.is_empty());
+    let staging_branch = ui::input_optional(&t("staging_branch"), "")?.filter(|s| !s.is_empty());
+    let prod_branch = ui::input_optional(&t("prod_branch"), "")?.filter(|s| !s.is_empty());
+
+    // 7. Validate branches against remote
     ui::info(&t("fetching_remote"));
     let _ = git::fetch(&resolved);
 
@@ -54,34 +65,15 @@ pub fn run(path: &str) -> Result<()> {
         .filter_map(|b| b.strip_prefix("origin/").map(|s| s.to_string()))
         .collect();
 
-    // 6. Main branch - direct input + validation
-    let current = git::current_branch(&resolved).unwrap_or_else(|_| "main".to_string());
-    let main_branch = input_branch_with_validation(
-        &t("main_branch"),
-        &current,
-        &clean_branches,
-        true,
-    )?.unwrap(); // safe: required=true guarantees Some
-
-    // 7. Environment branches - direct input + validation (optional)
-    let test_branch = input_branch_with_validation(
-        &t("test_branch"),
-        "",
-        &clean_branches,
-        false,
-    )?;
-    let staging_branch = input_branch_with_validation(
-        &t("staging_branch"),
-        "",
-        &clean_branches,
-        false,
-    )?;
-    let prod_branch = input_branch_with_validation(
-        &t("prod_branch"),
-        "",
-        &clean_branches,
-        false,
-    )?;
+    if !clean_branches.is_empty() {
+        for branch in [Some(&main_branch), test_branch.as_ref(), staging_branch.as_ref(), prod_branch.as_ref()].into_iter().flatten() {
+            if clean_branches.contains(branch) {
+                ui::success(&t("branch_exists").replace("{}", branch));
+            } else {
+                ui::warn(&t("branch_not_found").replace("{}", branch));
+            }
+        }
+    }
 
     // 8. Optional agents.md configuration
     let agents_md = ui::input_optional(&t("agents_md_path"), &t("press_enter_skip"))?;
@@ -125,46 +117,6 @@ pub fn run(path: &str) -> Result<()> {
 
     ui::success(&t("project_added").replace("{}", &name));
     Ok(())
-}
-
-/// Prompt user to input a branch name directly, then validate against remote branches.
-/// If `required` is true, empty input is not allowed.
-/// Returns None for optional branches when input is empty.
-fn input_branch_with_validation(
-    prompt: &str,
-    default: &str,
-    remote_branches: &[String],
-    required: bool,
-) -> Result<Option<String>> {
-    loop {
-        let value = if default.is_empty() {
-            ui::input_optional(prompt, "")?.unwrap_or_default()
-        } else {
-            ui::input(prompt, default)?
-        };
-
-        if value.is_empty() {
-            if required {
-                ui::error(&t("field_required"));
-                continue;
-            }
-            ui::info(&t("skipped"));
-            return Ok(None);
-        }
-
-        // Validate: check if origin/<branch> exists in remote
-        if remote_branches.contains(&value) {
-            ui::success(&t("branch_exists").replace("{}", &value));
-        } else if !remote_branches.is_empty() {
-            ui::warn(&t("branch_not_found").replace("{}", &value));
-            if !ui::confirm(&t("continue_branch"), true)? {
-                continue;
-            }
-        }
-        // If remote_branches is empty, skip validation silently
-
-        return Ok(Some(value));
-    }
 }
 
 /// Prompt user to select a group from existing groups, create a new one, or choose ungrouped.
