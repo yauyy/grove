@@ -64,6 +64,17 @@ pub fn fetch(dir: &Path) -> Result<()> {
     Ok(())
 }
 
+/// Resolve the best start point for branch creation.
+/// Prefers `origin/{branch}` (remote latest) over local branch.
+pub fn resolve_remote_start_point(dir: &Path, branch: &str) -> String {
+    let remote_ref = format!("origin/{}", branch);
+    let output = run_git(dir, &["rev-parse", "--verify", &remote_ref]);
+    match output {
+        Ok(o) if o.success => remote_ref,
+        _ => branch.to_string(),
+    }
+}
+
 /// Add a new worktree with --no-track.
 pub fn worktree_add(
     repo_dir: &Path,

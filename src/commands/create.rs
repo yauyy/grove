@@ -134,8 +134,9 @@ pub fn run(name: Option<String>) -> Result<()> {
         // b. git fetch origin (best effort)
         let _ = git::fetch(repo_dir);
 
-        // c. git worktree add
-        match git::worktree_add(repo_dir, &wt_path, &branch, &project.branches.main) {
+        // c. git worktree add (prefer remote latest)
+        let start_point = git::resolve_remote_start_point(repo_dir, &project.branches.main);
+        match git::worktree_add(repo_dir, &wt_path, &branch, &start_point) {
             Ok(()) => {
                 ws_projects.push(WorkspaceProject {
                     name: project.name.clone(),

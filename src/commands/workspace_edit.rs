@@ -130,8 +130,9 @@ pub fn run(name: Option<String>) -> Result<()> {
             // git fetch (best effort)
             let _ = git::fetch(repo_dir);
 
-            // git worktree add with same branch, --no-track
-            match git::worktree_add(repo_dir, &wt_path, &branch, &project.branches.main) {
+            // git worktree add with same branch, --no-track (prefer remote latest)
+            let start_point = git::resolve_remote_start_point(repo_dir, &project.branches.main);
+            match git::worktree_add(repo_dir, &wt_path, &branch, &start_point) {
                 Ok(()) => {
                     new_ws_projects.push(WorkspaceProject {
                         name: project.name.clone(),
