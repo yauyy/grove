@@ -60,8 +60,9 @@ grove add /path/to/backend
 添加时会交互式引导你：
 
 - 选择分组（前端 / 后端 / 新建分组）
-- 直接输入远程主分支名（自动校验是否存在）
-- 配置环境分支（测试 / 预发 / 正式，可选，直接输入 + 校验）
+- 输入主分支名（默认 master）
+- 配置环境分支（测试 / 预发 / 正式，可选）
+- 自动校验分支是否存在于远程
 - 配置 agents.md（可选）
 
 ### 2. 创建工作区
@@ -334,7 +335,7 @@ grove add /path/to/frontend
 grove add /path/to/backend
 ```
 
-Interactive prompts guide you through: group selection, branch name input with remote validation, environment branches (optional), agents.md (optional).
+Interactive prompts guide you through: group selection, main branch (default master), environment branches (optional), remote validation, agents.md (optional).
 
 ### 2. Create a Workspace
 
