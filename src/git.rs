@@ -151,6 +151,7 @@ pub fn is_clean(dir: &Path) -> Result<bool> {
 }
 
 /// Get the current branch name.
+#[cfg(test)]
 pub fn current_branch(dir: &Path) -> Result<String> {
     let output = run_git_checked(dir, &["rev-parse", "--abbrev-ref", "HEAD"])?;
     Ok(output.stdout)
