@@ -98,6 +98,22 @@ fn en() -> HashMap<&'static str, &'static str> {
     m.insert("directory_removed", "Directory removed: {}");
     m.insert("workspace_deleted", "Workspace '{}' deleted.");
 
+    // grove rename (workspace)
+    m.insert("new_workspace_name", "New workspace name");
+    m.insert("workspace_name_exists", "Workspace name '{}' already exists.");
+    m.insert("rename_branch_too", "Rename corresponding branch as well?");
+    m.insert("ws_rename_success", "Workspace '{}' renamed to '{}'.");
+    m.insert("ws_rename_branch_failed", "{}: failed to rename branch: {}");
+
+    // grove grename (branch)
+    m.insert("new_branch_name", "New branch name");
+    m.insert("branch_already_exists", "Branch '{}' already exists in project '{}'");
+    m.insert("rename_confirm", "Rename branch from '{}' to '{}' in {} project(s)?");
+    m.insert("workspace_branch_renamed", "Workspace '{}' branch renamed to '{}'");
+
+    // grove delete (branch prompt)
+    m.insert("delete_local_branch", "Delete local branch '{}'? (remote branches will not be affected)");
+
     // grove status
     m.insert("no_workspaces_status", "No workspaces. Create one with 'grove create'.");
     m.insert("clean", "clean");
@@ -218,6 +234,22 @@ fn zh() -> HashMap<&'static str, &'static str> {
     m.insert("branch_deleted", "{}: 分支 '{}' 已删除");
     m.insert("directory_removed", "目录已删除: {}");
     m.insert("workspace_deleted", "工作区 '{}' 已删除。");
+
+    // grove rename (workspace)
+    m.insert("new_workspace_name", "新工作区名称");
+    m.insert("workspace_name_exists", "工作区名称 '{}' 已存在。");
+    m.insert("rename_branch_too", "是否同时重命名对应分支？");
+    m.insert("ws_rename_success", "工作区 '{}' 已重命名为 '{}'。");
+    m.insert("ws_rename_branch_failed", "{}: 分支重命名失败: {}");
+
+    // grove grename (branch)
+    m.insert("new_branch_name", "新分支名称");
+    m.insert("branch_already_exists", "分支 '{}' 在项目 '{}' 中已存在");
+    m.insert("rename_confirm", "是否将 {} 个项目的分支从 '{}' 重命名为 '{}'？");
+    m.insert("workspace_branch_renamed", "工作区 '{}' 的分支已重命名为 '{}'");
+
+    // grove delete (branch prompt)
+    m.insert("delete_local_branch", "是否同时删除本地分支 '{}'？（该操作不会删除远程分支）");
 
     // grove status
     m.insert("no_workspaces_status", "暂无工作区。使用 'grove create' 创建。");

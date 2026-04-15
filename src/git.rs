@@ -75,7 +75,7 @@ pub fn resolve_remote_start_point(dir: &Path, branch: &str) -> String {
     }
 }
 
-/// Add a new worktree with --no-track.
+/// Add a new worktree with a new branch (--no-track).
 pub fn worktree_add(
     repo_dir: &Path,
     worktree_path: &Path,
@@ -92,6 +92,15 @@ pub fn worktree_add(
     Ok(())
 }
 
+/// Add a worktree using an existing branch.
+pub fn worktree_add_existing(repo_dir: &Path, worktree_path: &Path, branch: &str) -> Result<()> {
+    let wt_str = worktree_path
+        .to_str()
+        .context("Invalid worktree path encoding")?;
+    run_git_checked(repo_dir, &["worktree", "add", wt_str, branch])?;
+    Ok(())
+}
+
 /// Remove a worktree.
 pub fn worktree_remove(repo_dir: &Path, worktree_path: &Path) -> Result<()> {
     let wt_str = worktree_path
@@ -101,9 +110,21 @@ pub fn worktree_remove(repo_dir: &Path, worktree_path: &Path) -> Result<()> {
     Ok(())
 }
 
+/// Prune stale worktree entries.
+pub fn worktree_prune(repo_dir: &Path) -> Result<()> {
+    run_git_checked(repo_dir, &["worktree", "prune"])?;
+    Ok(())
+}
+
 /// Delete a local branch.
 pub fn branch_delete(dir: &Path, branch: &str) -> Result<()> {
     run_git_checked(dir, &["branch", "-D", branch])?;
+    Ok(())
+}
+
+/// Rename a local branch.
+pub fn branch_rename(dir: &Path, old_name: &str, new_name: &str) -> Result<()> {
+    run_git_checked(dir, &["branch", "-m", old_name, new_name])?;
     Ok(())
 }
 
@@ -111,6 +132,12 @@ pub fn branch_delete(dir: &Path, branch: &str) -> Result<()> {
 pub fn branch_exists(dir: &Path, branch: &str) -> Result<bool> {
     let output = run_git(dir, &["rev-parse", "--verify", branch])?;
     Ok(output.success)
+}
+
+/// Repair worktree administrative files after moving worktree directories.
+pub fn worktree_repair(repo_dir: &Path) -> Result<()> {
+    run_git_checked(repo_dir, &["worktree", "repair"])?;
+    Ok(())
 }
 
 /// Stage all changes.
@@ -237,6 +264,21 @@ mod tests {
         fs::write(tmp.path().join("new.txt"), "new").unwrap();
         let status = status_short(tmp.path()).unwrap();
         assert!(status.contains("new.txt"));
+    }
+
+    #[test]
+    fn test_branch_rename() {
+        let tmp = create_test_repo();
+        let dir = tmp.path();
+
+        // Create a branch to rename
+        run_git_checked(dir, &["branch", "old-branch"]).unwrap();
+        assert!(branch_exists(dir, "old-branch").unwrap());
+
+        // Rename it
+        branch_rename(dir, "old-branch", "new-branch").unwrap();
+        assert!(!branch_exists(dir, "old-branch").unwrap());
+        assert!(branch_exists(dir, "new-branch").unwrap());
     }
 
     #[test]

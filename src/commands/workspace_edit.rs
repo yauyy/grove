@@ -102,7 +102,14 @@ pub fn run(name: Option<String>) -> Result<()> {
         }
     }
 
-    // 10. Process removals
+    // 10. Ask whether to delete local branch for removed projects
+    let delete_branch = if !removals.is_empty() {
+        ui::confirm(&t("delete_local_branch").replace("{}", &branch), false)?
+    } else {
+        false
+    };
+
+    // 11. Process removals
     for removal in &removals {
         // Find the project's repo dir
         if let Some(project) = projects_file.projects.iter().find(|p| p.name == *removal) {
@@ -111,13 +118,21 @@ pub fn run(name: Option<String>) -> Result<()> {
             if wt_path.exists() {
                 match git::worktree_remove(repo_dir, &wt_path) {
                     Ok(()) => ui::success(&format!("Removed worktree for '{}'", removal)),
-                    Err(e) => ui::error(&format!("Failed to remove worktree for '{}': {}", removal, e)),
+                    Err(_) => {
+                        // Worktree not recognized by git, clean up manually
+                        let _ = std::fs::remove_dir_all(&wt_path);
+                        let _ = git::worktree_prune(repo_dir);
+                        ui::success(&format!("Cleaned up worktree for '{}'", removal));
+                    }
                 }
+            }
+            if delete_branch {
+                let _ = git::branch_delete(repo_dir, &branch);
             }
         }
     }
 
-    // 11. Process additions
+    // 12. Process additions
     let mut added_count = 0;
     let mut add_failed = 0;
     let mut new_ws_projects: Vec<WorkspaceProject> = Vec::new();
@@ -130,9 +145,14 @@ pub fn run(name: Option<String>) -> Result<()> {
             // git fetch (best effort)
             let _ = git::fetch(repo_dir);
 
-            // git worktree add with same branch, --no-track (prefer remote latest)
-            let start_point = git::resolve_remote_start_point(repo_dir, &project.branches.main);
-            match git::worktree_add(repo_dir, &wt_path, &branch, &start_point) {
+            // If branch already exists, checkout it; otherwise create new branch
+            let result = if git::branch_exists(repo_dir, &branch).unwrap_or(false) {
+                git::worktree_add_existing(repo_dir, &wt_path, &branch)
+            } else {
+                let start_point = git::resolve_remote_start_point(repo_dir, &project.branches.main);
+                git::worktree_add(repo_dir, &wt_path, &branch, &start_point)
+            };
+            match result {
                 Ok(()) => {
                     new_ws_projects.push(WorkspaceProject {
                         name: project.name.clone(),

@@ -10,11 +10,11 @@ use clap::{Parser, Subcommand};
 #[derive(Parser)]
 #[command(name = "grove", version, about = "Multi-project git worktree workspace manager")]
 pub struct Cli {
-    /// Edit a workspace configuration (interactive if name omitted)
-    #[arg(short = 'w', long = "workspace")]
-    workspace: Option<Option<String>>,
+    /// Workspace operations: -w [create|remove|rename|status|code|edit|<name>]
+    #[arg(short = 'w', long = "workspace", num_args = 0..=2)]
+    workspace: Option<Vec<String>>,
 
-    /// Create a shortcut for the current directory (interactive if name omitted)
+    /// Create a workspace (shortcut for -w create)
     #[arg(short = 'c', long = "create")]
     create: Option<Option<String>>,
 
@@ -24,16 +24,17 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Add a project to the current workspace
+    /// Add a project
     Add {
         /// Path to the project directory
         path: String,
     },
 
-    /// Remove a project from the current workspace
+    /// Remove a project
+    #[command(alias = "rm")]
     Remove,
 
-    /// List all projects in the current workspace
+    /// List all projects
     #[command(alias = "ls")]
     List,
 
@@ -43,33 +44,24 @@ enum Commands {
         action: GroupCommands,
     },
 
-    /// Move to a project directory
+    /// Move a project to another group
     #[command(alias = "mv")]
     Move {
         /// Project name (interactive if omitted)
         project: Option<String>,
     },
 
-    /// Create a new worktree branch for a project
-    Create {
-        /// Branch name (interactive if omitted)
-        name: Option<String>,
-    },
-
-    /// Delete a worktree branch
-    Delete,
-
-    /// Show status of all projects
-    #[command(alias = "st")]
-    Status,
-
-    /// Sync all projects (fetch + rebase)
+    /// Sync all projects (fetch + merge)
     #[command(alias = "sy")]
     Sync,
 
-    /// Merge current branch into main for all projects
+    /// Merge current branch into environment for all projects
     #[command(alias = "gm")]
     Gmerge,
+
+    /// Rename branch for all projects in a workspace
+    #[command(alias = "grn")]
+    Grename,
 
     /// Show git status for all projects
     #[command(alias = "gs")]
@@ -101,12 +93,6 @@ enum Commands {
     Completion {
         /// Shell to generate completions for (bash, zsh, fish, powershell)
         shell: String,
-    },
-
-    /// Open a workspace in VS Code
-    Code {
-        /// Workspace name (interactive if omitted)
-        name: Option<String>,
     },
 
     /// Set display language (en/zh)
@@ -152,11 +138,21 @@ enum ConfigCommands {
 fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
 
-    // Handle top-level flags first
-    if let Some(ref name) = cli.workspace {
-        return commands::workspace_edit::run(name.clone());
+    // Handle -w (workspace operations)
+    if let Some(ref args) = cli.workspace {
+        return match args.first().map(|s| s.as_str()) {
+            Some("create") | Some("c") => commands::create::run(args.get(1).cloned()),
+            Some("remove") | Some("rm") => commands::delete::run(),
+            Some("rename") | Some("rn") => commands::rename::run(),
+            Some("status") | Some("st") => commands::status::run(),
+            Some("code") => commands::code::run(args.get(1).cloned()),
+            Some("edit") => commands::workspace_edit::run(args.get(1).cloned()),
+            Some(name) => commands::workspace_edit::run(Some(name.to_string())),
+            None => commands::workspace_edit::run(None),
+        };
     }
 
+    // Handle -c (shortcut for -w create)
     if let Some(ref name) = cli.create {
         return commands::create::run(name.clone());
     }
@@ -172,11 +168,9 @@ fn main() -> anyhow::Result<()> {
             GroupCommands::Reorder => commands::group::reorder(),
         },
         Some(Commands::Move { ref project }) => commands::mov::run(project.clone()),
-        Some(Commands::Create { ref name }) => commands::create::run(name.clone()),
-        Some(Commands::Delete) => commands::delete::run(),
-        Some(Commands::Status) => commands::status::run(),
         Some(Commands::Sync) => commands::sync::run(),
         Some(Commands::Gmerge) => commands::git_ops::gmerge(),
+        Some(Commands::Grename) => commands::rename::grename(),
         Some(Commands::Gstatus) => commands::git_ops::gstatus(),
         Some(Commands::Gadd) => commands::git_ops::gadd(),
         Some(Commands::Gcommit) => commands::git_ops::gcommit(),
@@ -188,7 +182,6 @@ fn main() -> anyhow::Result<()> {
             ConfigCommands::Edit { ref file } => commands::config::edit(file.as_deref()),
         },
         Some(Commands::Completion { ref shell }) => commands::completion::run(shell),
-        Some(Commands::Code { ref name }) => commands::code::run(name.clone()),
         Some(Commands::Language { ref lang }) => commands::language::run(lang),
         None => {
             // No command given, print help

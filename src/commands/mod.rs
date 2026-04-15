@@ -10,6 +10,7 @@ pub mod language;
 pub mod list;
 pub mod mov;
 pub mod remove;
+pub mod rename;
 pub mod status;
 pub mod sync;
 pub mod workspace_edit;

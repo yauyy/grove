@@ -54,8 +54,14 @@ pub fn run() -> Result<()> {
         }
     }
 
-    // 6. For each project: worktree remove, branch delete
+    // 6. Ask whether to delete local branch (default: No)
     let branch = ws.branch.clone();
+    let delete_branch = ui::confirm(
+        &t("delete_local_branch").replace("{}", &branch),
+        false,
+    )?;
+
+    // 7. For each project: worktree remove, optionally branch delete
     for wp in &ws.projects {
         // Find the project's repo dir from projects_file
         if let Some(project) = projects_file.projects.iter().find(|p| p.name == wp.name) {
@@ -66,15 +72,18 @@ pub fn run() -> Result<()> {
             if wt_path.exists() {
                 match git::worktree_remove(repo_dir, wt_path) {
                     Ok(()) => {}
-                    Err(e) => ui::warn(&format!(
-                        "Failed to remove worktree for '{}': {}",
-                        wp.name, e
-                    )),
+                    Err(_) => {
+                        // Worktree not recognized by git, clean up manually
+                        let _ = std::fs::remove_dir_all(wt_path);
+                        let _ = git::worktree_prune(repo_dir);
+                    }
                 }
             }
 
-            // Delete branch (ignore errors - branch may already be gone)
-            let _ = git::branch_delete(repo_dir, &branch);
+            // Delete branch only if user confirmed
+            if delete_branch {
+                let _ = git::branch_delete(repo_dir, &branch);
+            }
         }
     }
 

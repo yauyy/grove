@@ -34,7 +34,7 @@ fn test_list_empty() {
 fn test_status_empty() {
     Command::cargo_bin("grove")
         .unwrap()
-        .arg("status")
+        .args(["-w", "status"])
         .assert()
         .success();
 }
@@ -89,7 +89,7 @@ fn test_aliases_ls() {
 fn test_aliases_st() {
     Command::cargo_bin("grove")
         .unwrap()
-        .arg("st")
+        .args(["-w", "st"])
         .assert()
         .success();
 }
