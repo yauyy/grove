@@ -1,6 +1,6 @@
 [package]
 name = "grove-cli"
-version = "0.4.2"
+version = "0.4.3"
 edition = "2021"
 description = "Multi-project git worktree workspace manager"
 license = "MIT"

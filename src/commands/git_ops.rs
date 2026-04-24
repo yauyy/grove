@@ -80,7 +80,7 @@ pub fn gcommit() -> Result<()> {
     let message_default = if tool == "manual" {
         String::new()
     } else {
-        match generate_commit_message(&tool, &projects) {
+        match generate_commit_message(tool, &projects) {
             Ok(message) => message,
             Err(e) => {
                 ui::warn(&format!("AI commit message generation failed: {}", e));
