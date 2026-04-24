@@ -74,22 +74,18 @@ pub fn project_is_go_project(worktree_path: &Path, _project: &Project) -> bool {
 }
 
 fn rebuild_go_work(workspace_dir: &Path, project_paths: &[PathBuf]) -> Result<()> {
-    let tmp_dir = workspace_dir.join(".grove-go-work-tmp");
-    if tmp_dir.exists() {
-        fs::remove_dir_all(&tmp_dir)
-            .with_context(|| format!("Failed to remove {}", tmp_dir.display()))?;
-    }
-    fs::create_dir(&tmp_dir).with_context(|| format!("Failed to create {}", tmp_dir.display()))?;
+    let tmp_go_work = workspace_dir.join(".grove-go.work.tmp");
+    let tmp_go_work_sum = workspace_dir.join(".grove-go.work.tmp.sum");
+    remove_file_if_exists(&tmp_go_work)?;
+    remove_file_if_exists(&tmp_go_work_sum)?;
 
     let result = (|| -> Result<()> {
-        let tmp_go_work = tmp_dir.join("go.work");
-        let tmp_go_work_sum = tmp_dir.join("go.work.sum");
         let final_go_work = workspace_dir.join("go.work");
         let final_go_work_sum = workspace_dir.join("go.work.sum");
 
-        let init_args = build_go_work_init_args(project_paths);
+        let init_args = build_go_work_init_args(workspace_dir, project_paths);
         let init_arg_refs: Vec<&str> = init_args.iter().map(String::as_str).collect();
-        run_go(&tmp_dir, &init_arg_refs)?;
+        run_go_with_workspace_file(workspace_dir, &init_arg_refs, Some(&tmp_go_work))?;
         run_go_with_workspace_file(workspace_dir, &["work", "sync"], Some(&tmp_go_work))?;
 
         fs::rename(&tmp_go_work, &final_go_work).with_context(|| {
@@ -116,33 +112,41 @@ fn rebuild_go_work(workspace_dir: &Path, project_paths: &[PathBuf]) -> Result<()
         Ok(())
     })();
 
-    let _ = fs::remove_dir_all(&tmp_dir);
+    let _ = fs::remove_file(&tmp_go_work);
+    let _ = fs::remove_file(&tmp_go_work_sum);
     result
 }
 
-fn build_go_work_init_args(project_paths: &[PathBuf]) -> Vec<String> {
+fn build_go_work_init_args(workspace_dir: &Path, project_paths: &[PathBuf]) -> Vec<String> {
     let mut args = vec!["work".to_string(), "init".to_string()];
     args.extend(
         project_paths
             .iter()
-            .map(|path| path.to_string_lossy().to_string()),
+            .map(|path| go_work_use_path(workspace_dir, path)),
     );
     args
+}
+
+fn go_work_use_path(workspace_dir: &Path, project_path: &Path) -> String {
+    match project_path.strip_prefix(workspace_dir) {
+        Ok(relative) => format!("./{}", relative.to_string_lossy().replace('\\', "/")),
+        Err(_) => project_path.to_string_lossy().replace('\\', "/"),
+    }
 }
 
 fn remove_go_work_files(workspace_dir: &Path) -> Result<()> {
     for file_name in ["go.work", "go.work.sum"] {
         let path = workspace_dir.join(file_name);
-        if path.exists() {
-            fs::remove_file(&path)
-                .with_context(|| format!("Failed to remove {}", path.display()))?;
-        }
+        remove_file_if_exists(&path)?;
     }
     Ok(())
 }
 
-fn run_go(dir: &Path, args: &[&str]) -> Result<()> {
-    run_go_with_workspace_file(dir, args, None)
+fn remove_file_if_exists(path: &Path) -> Result<()> {
+    if path.exists() {
+        fs::remove_file(path).with_context(|| format!("Failed to remove {}", path.display()))?;
+    }
+    Ok(())
 }
 
 fn run_go_with_workspace_file(dir: &Path, args: &[&str], gowork: Option<&Path>) -> Result<()> {
@@ -245,5 +249,25 @@ mod tests {
         };
 
         assert!(project_is_go_project(tmp.path(), &project));
+    }
+
+    #[test]
+    fn test_build_go_work_init_args_uses_workspace_relative_paths() {
+        let tmp = tempfile::tempdir().unwrap();
+        let workspace_dir = tmp.path();
+        let common = workspace_dir.join("common");
+        let client = workspace_dir.join("table_server_client");
+
+        let args = build_go_work_init_args(workspace_dir, &[common, client]);
+
+        assert_eq!(
+            args,
+            vec![
+                "work".to_string(),
+                "init".to_string(),
+                "./common".to_string(),
+                "./table_server_client".to_string(),
+            ]
+        );
     }
 }
