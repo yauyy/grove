@@ -137,6 +137,19 @@ grove language en
 grove config set git-prefix feat-
 # 例如：工作区名 login → 分支名默认 feat-login
 
+# 日期模板会按当天展开
+grove config set git-prefix 'feature/ymy/[YYYYMMDD]/'
+# 例如：2026-04-24 创建 login → feature/ymy/20260424/login
+
+# 设置 gcommit 提交信息来源（manual/codex/claude/copilot/cursor）
+grove config set commit-message-tool codex
+
+# 创建工作区后自动生成/同步 go.work
+grove config set auto-go-work true
+
+# 为旧项目自动补 tags（目前识别 go.mod → tags = ["go"]）
+grove tags
+
 # 直接编辑配置文件
 grove config edit           # 编辑 projects.toml
 grove config edit config    # 编辑 config.toml
@@ -155,6 +168,7 @@ grove config edit workspaces # 编辑 workspaces.toml
 | `grove remove` | `grove rm` | 移除已注册的项目 |
 | `grove list` | `grove ls` | 列出所有项目（按分组展示） |
 | `grove move` | `grove mv` | 移动项目到其他分组 |
+| `grove tags` | | 自动识别并更新项目 tags |
 
 ### 分组管理
 
@@ -188,13 +202,16 @@ grove config edit workspaces # 编辑 workspaces.toml
 | `grove gcommit` | `grove gc` | 统一提交消息 |
 | `grove gpush` | `grove gp` | 推送到远程同名分支 |
 | `grove gpull` | `grove gl` | 拉取远程更新 |
+| `grove gowork` | `grove gw` | 为当前工作区生成/更新 go.work |
 
 ### 配置与工具
 
 | 命令 | 说明 |
 |------|------|
 | `grove config set workpath <path>` | 设置工作区根目录（仅影响新建工作区） |
-| `grove config set git-prefix <prefix>` | 设置 Git 分支前缀（如 `feat-`） |
+| `grove config set git-prefix <prefix>` | 设置 Git 分支前缀（如 `feat-`，支持 `[YYYYMMDD]` / `[YYYY-MM-DD]` / `[YYYY/MM/DD]`） |
+| `grove config set commit-message-tool <tool>` | 设置 gcommit 提交信息来源（manual/codex/claude/copilot/cursor） |
+| `grove config set auto-go-work <true/false>` | 创建工作区后自动生成/同步 go.work |
 | `grove config list` | 查看当前配置 |
 | `grove config edit [file]` | 编辑配置文件（projects/config/workspaces） |
 | `grove language <en/zh>` | 切换界面语言 |
@@ -218,6 +235,8 @@ grove config edit workspaces # 编辑 workspaces.toml
 workpath = "~/grove-workspaces"   # 工作区根目录
 language = "zh"                   # 界面语言（en / zh）
 git_prefix = "feat-"              # Git 分支前缀（可选，默认为空）
+commit_message_tool = "manual"    # gcommit 提交信息来源
+auto_go_work = false              # 创建工作区后自动同步 go.work
 ```
 
 ### projects.toml
@@ -232,6 +251,7 @@ name = "web-app"
 path = "/Users/you/projects/web-app"
 group = "frontend"
 order = 0
+tags = ["go"]              # 可选；grove tags 可自动识别 go.mod 并补充
 
 [projects.branches]
 main = "main"
@@ -392,6 +412,19 @@ grove language en           # switch to English
 grove config set git-prefix feat-
 # e.g. workspace "login" → branch defaults to "feat-login"
 
+# Date templates are expanded using today's date
+grove config set git-prefix 'feature/ymy/[YYYYMMDD]/'
+# e.g. on 2026-04-24 workspace "login" → "feature/ymy/20260424/login"
+
+# Set gcommit message source (manual/codex/claude/copilot/cursor)
+grove config set commit-message-tool codex
+
+# Generate/sync go.work automatically after workspace creation
+grove config set auto-go-work true
+
+# Backfill tags for existing projects (go.mod → tags = ["go"])
+grove tags
+
 grove config edit           # edit projects.toml
 grove config edit config    # edit config.toml
 ```
@@ -409,6 +442,7 @@ Commands are organized in three dimensions: **Project** (top-level), **Workspace
 | `grove list` | `ls` | List projects (grouped) |
 | `grove move` | `mv` | Move project between groups |
 | `grove group add/remove/list/reorder` | | Group management |
+| `grove tags` | | Auto-detect and update project tags |
 
 ### Workspace Management (`-w`)
 
@@ -433,13 +467,16 @@ Commands are organized in three dimensions: **Project** (top-level), **Workspace
 | `grove gcommit` | `gc` | Batch git commit |
 | `grove gpush` | `gp` | Batch git push |
 | `grove gpull` | `gl` | Batch git pull |
+| `grove gowork` | `gw` | Generate/update go.work for the current workspace |
 
 ### Configuration & Tools
 
 | Command | Description |
 |---------|-------------|
 | `grove config set workpath <path>` | Set workspace root (affects new workspaces only) |
-| `grove config set git-prefix <prefix>` | Set git branch prefix (e.g. `feat-`) |
+| `grove config set git-prefix <prefix>` | Set git branch prefix (supports `[YYYYMMDD]`, `[YYYY-MM-DD]`, `[YYYY/MM/DD]`) |
+| `grove config set commit-message-tool <tool>` | Set gcommit message source (manual/codex/claude/copilot/cursor) |
+| `grove config set auto-go-work <true/false>` | Generate/sync go.work after workspace creation |
 | `grove config list` | View current config |
 | `grove config edit [file]` | Edit config file in editor |
 | `grove language <en/zh>` | Set display language |
@@ -463,6 +500,8 @@ All configuration is stored in `~/.grove/`:
 workpath = "~/grove-workspaces"   # Workspace root directory
 language = "en"                   # UI language (en / zh)
 git_prefix = "feat-"              # Git branch prefix (optional, empty by default)
+commit_message_tool = "manual"    # gcommit message source
+auto_go_work = false              # Auto-sync go.work after workspace creation
 ```
 
 ### projects.toml
@@ -477,6 +516,7 @@ name = "web-app"
 path = "/Users/you/projects/web-app"
 group = "frontend"
 order = 0
+tags = ["go"]              # optional; grove tags can detect go.mod and backfill this
 
 [projects.branches]
 main = "main"

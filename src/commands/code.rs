@@ -34,9 +34,7 @@ pub fn run(name: Option<String>) -> Result<()> {
 
     ui::info(&t("opening_editor").replace("{}", &ws.name));
 
-    let status = Command::new("code")
-        .arg(&ws_dir)
-        .status();
+    let status = Command::new("code").arg(&ws_dir).status();
 
     match status {
         Ok(s) if s.success() => {

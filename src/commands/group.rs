@@ -80,7 +80,12 @@ pub fn list() -> Result<()> {
 
     for group in &groups {
         let count = pf.projects.iter().filter(|p| p.group == group.name).count();
-        println!("  {} ({} project{})", group.name, count, if count == 1 { "" } else { "s" });
+        println!(
+            "  {} ({} project{})",
+            group.name,
+            count,
+            if count == 1 { "" } else { "s" }
+        );
     }
 
     let ungrouped_count = pf.projects.iter().filter(|p| p.group.is_empty()).count();
@@ -95,7 +100,10 @@ pub fn list() -> Result<()> {
     }
 
     if pf.groups.is_empty() && ungrouped_count > 0 {
-        println!("  No groups defined. All {} project(s) are ungrouped.", ungrouped_count);
+        println!(
+            "  No groups defined. All {} project(s) are ungrouped.",
+            ungrouped_count
+        );
     }
 
     Ok(())

@@ -87,7 +87,15 @@ pub fn worktree_add(
         .context("Invalid worktree path encoding")?;
     run_git_checked(
         repo_dir,
-        &["worktree", "add", "-b", branch, "--no-track", wt_str, start_point],
+        &[
+            "worktree",
+            "add",
+            "-b",
+            branch,
+            "--no-track",
+            wt_str,
+            start_point,
+        ],
     )?;
     Ok(())
 }
@@ -152,6 +160,28 @@ pub fn commit(dir: &Path, message: &str) -> Result<()> {
     Ok(())
 }
 
+/// Return whether the index contains staged changes.
+pub fn has_staged_changes(dir: &Path) -> Result<bool> {
+    let output = run_git(dir, &["diff", "--cached", "--quiet"])?;
+    if !output.success && !output.stderr.is_empty() {
+        bail!(
+            "git diff --cached --quiet failed in {}: {}",
+            dir.display(),
+            output.stderr
+        );
+    }
+    Ok(!output.success)
+}
+
+/// Get staged diff context suitable for commit message generation.
+pub fn staged_diff_summary(dir: &Path) -> Result<String> {
+    let stat = run_git_checked(dir, &["diff", "--cached", "--stat"])?;
+    let names = run_git_checked(dir, &["diff", "--cached", "--name-status"])?;
+    Ok(format!("{}\n{}", stat.stdout, names.stdout)
+        .trim()
+        .to_string())
+}
+
 /// Push the current branch and set upstream.
 pub fn push_upstream(dir: &Path, branch: &str) -> Result<()> {
     run_git_checked(dir, &["push", "-u", "origin", branch])?;
@@ -161,6 +191,12 @@ pub fn push_upstream(dir: &Path, branch: &str) -> Result<()> {
 /// Pull from remote.
 pub fn pull(dir: &Path) -> Result<()> {
     run_git_checked(dir, &["pull"])?;
+    Ok(())
+}
+
+/// Pull a specific remote branch using fast-forward only.
+pub fn pull_ff_only(dir: &Path, remote: &str, branch: &str) -> Result<()> {
+    run_git_checked(dir, &["pull", "--ff-only", remote, branch])?;
     Ok(())
 }
 

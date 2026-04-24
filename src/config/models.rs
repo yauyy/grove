@@ -8,6 +8,10 @@ pub struct GlobalConfig {
     pub language: String,
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub git_prefix: String,
+    #[serde(default = "default_commit_message_tool")]
+    pub commit_message_tool: String,
+    #[serde(default)]
+    pub auto_go_work: bool,
 }
 
 fn default_language() -> String {
@@ -25,12 +29,18 @@ fn default_language() -> String {
     "en".to_string()
 }
 
+fn default_commit_message_tool() -> String {
+    "manual".to_string()
+}
+
 impl Default for GlobalConfig {
     fn default() -> Self {
         Self {
             workpath: "~/grove-workspaces".to_string(),
             language: default_language(),
             git_prefix: String::new(),
+            commit_message_tool: default_commit_message_tool(),
+            auto_go_work: false,
         }
     }
 }
@@ -56,6 +66,8 @@ pub struct Project {
     pub group: String,
     #[serde(default)]
     pub order: u32,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tags: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub agents_md: Option<String>,
     pub branches: BranchConfig,
@@ -110,6 +122,8 @@ mod tests {
             workpath: "/tmp/my-workspaces".to_string(),
             language: "en".to_string(),
             git_prefix: String::new(),
+            commit_message_tool: "manual".to_string(),
+            auto_go_work: false,
         };
         let toml_str = toml::to_string(&config).unwrap();
         let parsed: GlobalConfig = toml::from_str(&toml_str).unwrap();
@@ -134,6 +148,7 @@ mod tests {
                 path: "/home/user/api".to_string(),
                 group: "backend".to_string(),
                 order: 1,
+                tags: vec!["go".to_string()],
                 agents_md: Some("/home/user/api/agents.md".to_string()),
                 branches: BranchConfig {
                     main: "main".to_string(),
@@ -147,6 +162,7 @@ mod tests {
         let parsed: ProjectsFile = toml::from_str(&toml_str).unwrap();
         assert_eq!(parsed.projects.len(), 1);
         assert_eq!(parsed.projects[0].name, "api");
+        assert_eq!(parsed.projects[0].tags, vec!["go"]);
         assert_eq!(parsed.projects[0].branches.main, "main");
         assert_eq!(parsed.projects[0].branches.test, Some("test".to_string()));
         assert_eq!(

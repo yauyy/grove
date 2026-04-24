@@ -32,7 +32,11 @@ pub fn run() -> Result<()> {
         ui::info(&t("no_changes"));
         return Ok(());
     }
-    if workspaces_file.workspaces.iter().any(|w| w.name == new_name) {
+    if workspaces_file
+        .workspaces
+        .iter()
+        .any(|w| w.name == new_name)
+    {
         bail!("{}", t("workspace_name_exists").replace("{}", &new_name));
     }
 
@@ -86,9 +90,11 @@ pub fn run() -> Result<()> {
                     branch_succeeded += 1;
                 }
                 Err(e) => {
-                    ui::warn(&t("ws_rename_branch_failed")
-                        .replacen("{}", &wp.name, 1)
-                        .replacen("{}", &e.to_string(), 1));
+                    ui::warn(
+                        &t("ws_rename_branch_failed")
+                            .replacen("{}", &wp.name, 1)
+                            .replacen("{}", &e.to_string(), 1),
+                    );
                     branch_failed += 1;
                 }
             }
@@ -104,9 +110,11 @@ pub fn run() -> Result<()> {
     // 6. Save
     config::save_workspaces(&workspaces_file)?;
 
-    ui::success(&t("ws_rename_success")
-        .replacen("{}", &old_name, 1)
-        .replacen("{}", &new_name, 1));
+    ui::success(
+        &t("ws_rename_success")
+            .replacen("{}", &old_name, 1)
+            .replacen("{}", &new_name, 1),
+    );
 
     Ok(())
 }

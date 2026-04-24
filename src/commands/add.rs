@@ -6,6 +6,14 @@ use crate::git;
 use crate::i18n::t;
 use crate::ui;
 
+pub fn detect_project_tags(path: &std::path::Path) -> Vec<String> {
+    if path.join("go.mod").is_file() {
+        vec!["go".to_string()]
+    } else {
+        Vec::new()
+    }
+}
+
 pub fn run(path: &str) -> Result<()> {
     // 1. Resolve and validate the path
     let resolved = PathBuf::from(path)
@@ -17,7 +25,10 @@ pub fn run(path: &str) -> Result<()> {
     }
 
     if !git::is_git_repo(&resolved) {
-        bail!("{}", t("not_git_repo").replace("{}", &resolved.to_string_lossy()));
+        bail!(
+            "{}",
+            t("not_git_repo").replace("{}", &resolved.to_string_lossy())
+        );
     }
 
     let path_str = resolved.to_string_lossy().to_string();
@@ -25,7 +36,10 @@ pub fn run(path: &str) -> Result<()> {
     // 2. Check if already registered
     let mut pf = config::load_projects()?;
     if pf.projects.iter().any(|p| p.path == path_str) {
-        bail!("{}", t("project_already_registered").replace("{}", &path_str));
+        bail!(
+            "{}",
+            t("project_already_registered").replace("{}", &path_str)
+        );
     }
 
     // 3. Auto-detect project name from directory name, let user modify
@@ -66,7 +80,15 @@ pub fn run(path: &str) -> Result<()> {
         .collect();
 
     if !clean_branches.is_empty() {
-        for branch in [Some(&main_branch), test_branch.as_ref(), staging_branch.as_ref(), prod_branch.as_ref()].into_iter().flatten() {
+        for branch in [
+            Some(&main_branch),
+            test_branch.as_ref(),
+            staging_branch.as_ref(),
+            prod_branch.as_ref(),
+        ]
+        .into_iter()
+        .flatten()
+        {
             if clean_branches.contains(branch) {
                 ui::success(&t("branch_exists").replace("{}", branch));
             } else {
@@ -103,6 +125,7 @@ pub fn run(path: &str) -> Result<()> {
         path: path_str,
         group,
         order,
+        tags: detect_project_tags(&resolved),
         agents_md,
         branches: BranchConfig {
             main: main_branch,
@@ -130,14 +153,21 @@ fn select_group(pf: &mut config::ProjectsFile) -> Result<String> {
     if idx == options.len() - 1 {
         Ok(String::new())
     } else if idx == options.len() - 2 {
-        let group_name = ui::input_with_placeholder(&t("group_name"), &t("placeholder_group_name"))?;
+        let group_name =
+            ui::input_with_placeholder(&t("group_name"), &t("placeholder_group_name"))?;
         if group_name.is_empty() {
             bail!("Group name cannot be empty");
         }
         if pf.groups.iter().any(|g| g.name == group_name) {
             bail!("{}", t("group_exists").replace("{}", &group_name));
         }
-        let order = pf.groups.iter().map(|g| g.order).max().map(|m| m + 1).unwrap_or(0);
+        let order = pf
+            .groups
+            .iter()
+            .map(|g| g.order)
+            .max()
+            .map(|m| m + 1)
+            .unwrap_or(0);
         pf.groups.push(Group {
             name: group_name.clone(),
             order,
@@ -145,5 +175,24 @@ fn select_group(pf: &mut config::ProjectsFile) -> Result<String> {
         Ok(group_name)
     } else {
         Ok(options[idx].clone())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+
+    #[test]
+    fn test_detect_project_tags_marks_go_projects() {
+        let tmp = tempfile::tempdir().unwrap();
+        fs::write(tmp.path().join("go.mod"), "module example.com/app\n").unwrap();
+        assert_eq!(detect_project_tags(tmp.path()), vec!["go"]);
+    }
+
+    #[test]
+    fn test_detect_project_tags_empty_for_non_go_projects() {
+        let tmp = tempfile::tempdir().unwrap();
+        assert!(detect_project_tags(tmp.path()).is_empty());
     }
 }

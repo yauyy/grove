@@ -45,7 +45,9 @@ pub fn run() -> Result<()> {
                             let change_count = output.lines().count();
                             format!(
                                 "{}",
-                                yellow.apply_to(t("changes").replace("{}", &change_count.to_string()))
+                                yellow.apply_to(
+                                    t("changes").replace("{}", &change_count.to_string())
+                                )
                             )
                         }
                     }

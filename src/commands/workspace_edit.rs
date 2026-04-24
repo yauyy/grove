@@ -22,13 +22,11 @@ pub fn run(name: Option<String>) -> Result<()> {
 
     // 3. Select workspace
     let ws_idx = match name {
-        Some(ref n) => {
-            workspaces_file
-                .workspaces
-                .iter()
-                .position(|ws| ws.name == *n)
-                .ok_or_else(|| anyhow::anyhow!("Workspace '{}' not found", n))?
-        }
+        Some(ref n) => workspaces_file
+            .workspaces
+            .iter()
+            .position(|ws| ws.name == *n)
+            .ok_or_else(|| anyhow::anyhow!("Workspace '{}' not found", n))?,
         None => {
             let ws_names: Vec<String> = workspaces_file
                 .workspaces
@@ -94,10 +92,7 @@ pub fn run(name: Option<String>) -> Result<()> {
         let wt_path = ws_dir.join(removal);
         if wt_path.exists() {
             if let Ok(false) = git::is_clean(&wt_path) {
-                bail!(
-                    "{}",
-                    t("uncommitted_changes").replace("{}", removal)
-                );
+                bail!("{}", t("uncommitted_changes").replace("{}", removal));
             }
         }
     }

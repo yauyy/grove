@@ -8,7 +8,11 @@ mod workspace;
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
-#[command(name = "grove", version, about = "Multi-project git worktree workspace manager")]
+#[command(
+    name = "grove",
+    version,
+    about = "Multi-project git worktree workspace manager"
+)]
 pub struct Cli {
     /// Workspace operations: -w [create|remove|rename|status|code|edit|<name>]
     #[arg(short = 'w', long = "workspace", num_args = 0..=2)]
@@ -82,6 +86,13 @@ enum Commands {
     /// Pull all projects
     #[command(alias = "gl")]
     Gpull,
+
+    /// Generate/update go.work for the current workspace
+    #[command(alias = "gw")]
+    Gowork,
+
+    /// Auto-detect and update project tags
+    Tags,
 
     /// Manage configuration
     Config {
@@ -176,6 +187,8 @@ fn main() -> anyhow::Result<()> {
         Some(Commands::Gcommit) => commands::git_ops::gcommit(),
         Some(Commands::Gpush) => commands::git_ops::gpush(),
         Some(Commands::Gpull) => commands::git_ops::gpull(),
+        Some(Commands::Gowork) => commands::gowork::run(),
+        Some(Commands::Tags) => commands::tags::run(),
         Some(Commands::Config { action }) => match action {
             ConfigCommands::Set { ref key, ref value } => commands::config::set(key, value),
             ConfigCommands::List => commands::config::list(),

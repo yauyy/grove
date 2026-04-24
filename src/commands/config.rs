@@ -29,8 +29,22 @@ pub fn set(key: &str, value: &str) -> Result<()> {
             cfg::save_global_config(&config)?;
             ui::success(&format!("git-prefix = {}", value));
         }
+        "commit-message-tool" => {
+            let normalized = crate::commands::git_ops::normalize_commit_message_tool(value);
+            config.commit_message_tool = normalized.to_string();
+            cfg::save_global_config(&config)?;
+            ui::success(&format!("commit-message-tool = {}", normalized));
+        }
+        "auto-go-work" => {
+            config.auto_go_work = parse_bool(value)?;
+            cfg::save_global_config(&config)?;
+            ui::success(&format!("auto-go-work = {}", config.auto_go_work));
+        }
         _ => {
-            bail!("Unknown config key: '{}'. Valid keys: workpath, git-prefix", key);
+            bail!(
+                "Unknown config key: '{}'. Valid keys: workpath, git-prefix, commit-message-tool, auto-go-work",
+                key
+            );
         }
     }
 
@@ -40,15 +54,21 @@ pub fn set(key: &str, value: &str) -> Result<()> {
 pub fn list() -> Result<()> {
     let config = cfg::load_global_config()?;
     let resolved = cfg::resolve_workpath(&config.workpath)?;
-    println!(
-        "workpath = {} ({})",
-        config.workpath,
-        resolved.display()
-    );
+    println!("workpath = {} ({})", config.workpath, resolved.display());
     if !config.git_prefix.is_empty() {
         println!("git-prefix = {}", config.git_prefix);
     }
+    println!("commit-message-tool = {}", config.commit_message_tool);
+    println!("auto-go-work = {}", config.auto_go_work);
     Ok(())
+}
+
+fn parse_bool(value: &str) -> Result<bool> {
+    match value.trim().to_ascii_lowercase().as_str() {
+        "true" | "yes" | "y" | "1" | "on" => Ok(true),
+        "false" | "no" | "n" | "0" | "off" => Ok(false),
+        _ => bail!("Invalid boolean value: '{}'. Use true or false", value),
+    }
 }
 
 pub fn edit(file: Option<&str>) -> Result<()> {
@@ -108,9 +128,11 @@ pub fn edit(file: Option<&str>) -> Result<()> {
             }
         });
 
-    ui::info(&t("config_edit_opening")
-        .replacen("{}", filename, 1)
-        .replacen("{}", &editor, 1));
+    ui::info(
+        &t("config_edit_opening")
+            .replacen("{}", filename, 1)
+            .replacen("{}", &editor, 1),
+    );
 
     let status = Command::new(&editor)
         .arg(&file_path)

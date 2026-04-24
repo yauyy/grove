@@ -79,10 +79,7 @@ pub fn merge_agents_md(projects: &[Project], output_path: &Path) -> Result<bool>
 
 /// Compute the intersection of environment branch names across the given projects.
 /// Returns environment names (test, staging, prod) that ALL specified projects have.
-pub fn common_environments(
-    projects_file: &ProjectsFile,
-    project_names: &[String],
-) -> Vec<String> {
+pub fn common_environments(projects_file: &ProjectsFile, project_names: &[String]) -> Vec<String> {
     let matching_projects: Vec<&Project> = projects_file
         .projects
         .iter()
@@ -120,7 +117,11 @@ pub fn get_env_branch<'a>(project: &'a Project, env_name: &str) -> Option<&'a St
 
 /// Resolve the worktree path for a workspace project.
 #[allow(dead_code)]
-pub fn resolve_worktree_path(workpath: &str, workspace_name: &str, project_name: &str) -> Result<PathBuf> {
+pub fn resolve_worktree_path(
+    workpath: &str,
+    workspace_name: &str,
+    project_name: &str,
+) -> Result<PathBuf> {
     let base = config::resolve_workpath(workpath)?;
     Ok(base.join(workspace_name).join(project_name))
 }
@@ -137,6 +138,7 @@ mod tests {
             path: format!("/tmp/{}", name),
             group: String::new(),
             order: 0,
+            tags: Vec::new(),
             agents_md: agents_md.map(|s| s.to_string()),
             branches,
         }

@@ -56,10 +56,7 @@ pub fn run() -> Result<()> {
 
     // 6. Ask whether to delete local branch (default: No)
     let branch = ws.branch.clone();
-    let delete_branch = ui::confirm(
-        &t("delete_local_branch").replace("{}", &branch),
-        false,
-    )?;
+    let delete_branch = ui::confirm(&t("delete_local_branch").replace("{}", &branch), false)?;
 
     // 7. For each project: worktree remove, optionally branch delete
     for wp in &ws.projects {
@@ -90,10 +87,7 @@ pub fn run() -> Result<()> {
     // 7. Remove workspace directory
     if ws_dir.exists() {
         if let Err(e) = fs::remove_dir_all(&ws_dir) {
-            ui::warn(&format!(
-                "Failed to remove workspace directory: {}",
-                e
-            ));
+            ui::warn(&format!("Failed to remove workspace directory: {}", e));
         }
     }
 

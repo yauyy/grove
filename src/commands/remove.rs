@@ -38,9 +38,11 @@ pub fn run() -> Result<()> {
         .collect();
 
     if !in_workspaces.is_empty() {
-        ui::warn(&t("project_in_workspaces")
-            .replacen("{}", &project_name, 1)
-            .replacen("{}", &in_workspaces.join(", "), 1));
+        ui::warn(
+            &t("project_in_workspaces")
+                .replacen("{}", &project_name, 1)
+                .replacen("{}", &in_workspaces.join(", "), 1),
+        );
         if !ui::confirm(&t("remove_anyway"), false)? {
             ui::info(&t("cancelled"));
             return Ok(());

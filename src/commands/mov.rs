@@ -14,12 +14,11 @@ pub fn run(project: Option<String>) -> Result<()> {
 
     // 1. Find or select project
     let project_idx = match project {
-        Some(ref name) => {
-            pf.projects
-                .iter()
-                .position(|p| p.name == *name)
-                .ok_or_else(|| anyhow::anyhow!("Project '{}' not found", name))?
-        }
+        Some(ref name) => pf
+            .projects
+            .iter()
+            .position(|p| p.name == *name)
+            .ok_or_else(|| anyhow::anyhow!("Project '{}' not found", name))?,
         None => {
             let names: Vec<String> = pf
                 .projects
@@ -77,8 +76,10 @@ pub fn run(project: Option<String>) -> Result<()> {
     } else {
         new_group
     };
-    ui::success(&t("project_moved")
-        .replacen("{}", &project_name, 1)
-        .replacen("{}", &display_group, 1));
+    ui::success(
+        &t("project_moved")
+            .replacen("{}", &project_name, 1)
+            .replacen("{}", &display_group, 1),
+    );
     Ok(())
 }

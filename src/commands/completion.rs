@@ -32,7 +32,8 @@ pub fn run(shell: &str) -> Result<()> {
 }
 
 fn print_zsh_workspace_completion(name: &str) {
-    println!(r#"
+    println!(
+        r#"
 # Custom workspace completion for grove code/delete/-w
 _grove_workspaces() {{
     local workspaces_file="$HOME/.grove/workspaces.toml"
@@ -47,11 +48,14 @@ _grove_workspaces() {{
 if (( $+functions[_{name}_commands] )); then
     _{name}_orig_commands=$functions[_{name}_commands]
 fi
-"#, name = name);
+"#,
+        name = name
+    );
 }
 
 fn print_bash_workspace_completion(name: &str) {
-    println!(r#"
+    println!(
+        r#"
 # Custom workspace completion for grove code/delete/-w
 _{name}_workspace_completions() {{
     local workspaces_file="$HOME/.grove/workspaces.toml"
@@ -70,13 +74,18 @@ _{name}_custom() {{
         return
     fi
 }}
-"#, name = name);
+"#,
+        name = name
+    );
 }
 
 fn print_fish_workspace_completion(name: &str) {
-    println!(r#"
+    println!(
+        r#"
 # Custom workspace completion for grove code
 complete -c {name} -n "__fish_seen_subcommand_from code" -xa "(grep '^name = ' ~/.grove/workspaces.toml 2>/dev/null | sed 's/name = \"//;s/\"//')"
 complete -c {name} -s w -l workspace -xa "(grep '^name = ' ~/.grove/workspaces.toml 2>/dev/null | sed 's/name = \"//;s/\"//')"
-"#, name = name);
+"#,
+        name = name
+    );
 }

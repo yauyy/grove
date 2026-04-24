@@ -42,11 +42,7 @@ pub fn run() -> Result<()> {
     }
 
     // Print ungrouped projects
-    let ungrouped: Vec<_> = pf
-        .projects
-        .iter()
-        .filter(|p| p.group.is_empty())
-        .collect();
+    let ungrouped: Vec<_> = pf.projects.iter().filter(|p| p.group.is_empty()).collect();
 
     if !ungrouped.is_empty() {
         println!("{}", bold.apply_to(t("ungrouped")));
@@ -63,6 +59,13 @@ pub fn run() -> Result<()> {
 }
 
 fn print_project(project: &config::Project, dim: &Style) {
+    println!(
+        "{}",
+        format_project_line(project, dim, &Style::new().cyan().bold())
+    );
+}
+
+fn format_project_line(project: &config::Project, dim: &Style, tag_style: &Style) -> String {
     let mut branch_info = project.branches.main.clone();
 
     let mut env_parts: Vec<String> = Vec::new();
@@ -79,10 +82,62 @@ fn print_project(project: &config::Project, dim: &Style) {
         branch_info = format!("{} [{}]", branch_info, env_parts.join(", "));
     }
 
-    println!(
+    let tags = format_tags(&project.tags, tag_style);
+    let name = if tags.is_empty() {
+        project.name.clone()
+    } else {
+        format!("{} {}", project.name, tags)
+    };
+
+    format!(
         "  {} {} {}",
-        project.name,
+        name,
         dim.apply_to(&project.path),
         dim.apply_to(format!("({})", branch_info))
-    );
+    )
+}
+
+fn format_tags(tags: &[String], tag_style: &Style) -> String {
+    tags.iter()
+        .map(|tag| tag_style.apply_to(format!("[{}]", tag)).to_string())
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn project_with_tags(tags: Vec<&str>) -> config::Project {
+        config::Project {
+            name: "api".to_string(),
+            path: "/tmp/api".to_string(),
+            group: String::new(),
+            order: 0,
+            tags: tags.into_iter().map(str::to_string).collect(),
+            agents_md: None,
+            branches: config::BranchConfig {
+                main: "main".to_string(),
+                test: None,
+                staging: None,
+                prod: None,
+            },
+        }
+    }
+
+    #[test]
+    fn test_format_project_line_shows_tags() {
+        let line =
+            format_project_line(&project_with_tags(vec!["go"]), &Style::new(), &Style::new());
+
+        assert!(line.contains("api [go]"));
+    }
+
+    #[test]
+    fn test_format_project_line_omits_empty_tags() {
+        let line = format_project_line(&project_with_tags(vec![]), &Style::new(), &Style::new());
+
+        assert!(line.contains("api /tmp/api"));
+        assert!(!line.contains("[]"));
+    }
 }

@@ -15,10 +15,7 @@ fn test_help_output() {
 
 #[test]
 fn test_no_args_shows_help() {
-    Command::cargo_bin("grove")
-        .unwrap()
-        .assert()
-        .success();
+    Command::cargo_bin("grove").unwrap().assert().success();
 }
 
 #[test]

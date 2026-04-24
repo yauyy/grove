@@ -76,7 +76,11 @@ pub fn run(name: Option<String>) -> Result<()> {
         bail!("Workspace name cannot be empty");
     }
 
-    if workspaces_file.workspaces.iter().any(|ws| ws.name == ws_name) {
+    if workspaces_file
+        .workspaces
+        .iter()
+        .any(|ws| ws.name == ws_name)
+    {
         bail!("{}", t("workspace_exists").replace("{}", &ws_name));
     }
 
@@ -92,14 +96,15 @@ pub fn run(name: Option<String>) -> Result<()> {
     }
 
     // 7. Prompt for branch name (with git_prefix if configured)
-    let branch_default = if global.git_prefix.is_empty() {
+    let git_prefix = config::expand_date_templates(&global.git_prefix);
+    let branch_default = if git_prefix.is_empty() {
         ws_name.clone()
     } else {
-        format!("{}{}", global.git_prefix, ws_name)
+        format!("{}{}", git_prefix, ws_name)
     };
     let input = ui::input(&t("branch_name"), &branch_default)?;
-    let branch = if !global.git_prefix.is_empty() && !input.starts_with(&global.git_prefix) {
-        format!("{}{}", global.git_prefix, input)
+    let branch = if !git_prefix.is_empty() && !input.starts_with(&git_prefix) {
+        format!("{}{}", git_prefix, input)
     } else {
         input
     };
@@ -147,7 +152,10 @@ pub fn run(name: Option<String>) -> Result<()> {
                 ui::success(&format!("Created worktree for '{}'", project.name));
             }
             Err(e) => {
-                ui::error(&format!("Failed to create worktree for '{}': {}", project.name, e));
+                ui::error(&format!(
+                    "Failed to create worktree for '{}': {}",
+                    project.name, e
+                ));
                 failed += 1;
             }
         }
@@ -173,8 +181,20 @@ pub fn run(name: Option<String>) -> Result<()> {
         created_at,
         projects: ws_projects,
     };
-    workspaces_file.workspaces.push(ws);
+    workspaces_file.workspaces.push(ws.clone());
     config::save_workspaces(&workspaces_file)?;
+
+    if global.auto_go_work {
+        let workspace_projects: Vec<(WorkspaceProject, config::Project)> = ws
+            .projects
+            .iter()
+            .cloned()
+            .zip(selected_projects.iter().cloned())
+            .collect();
+        if let Err(e) = crate::commands::gowork::sync_workspace(&ws, &workspace_projects) {
+            ui::warn(&format!("Failed to sync go.work: {}", e));
+        }
+    }
 
     // 12. Print summary
     println!();
