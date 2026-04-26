@@ -79,6 +79,7 @@ pub fn merge_agents_md(projects: &[Project], output_path: &Path) -> Result<bool>
 
 /// Compute the intersection of environment branch names across the given projects.
 /// Returns environment names (test, staging, prod) that ALL specified projects have.
+#[allow(dead_code)]
 pub fn common_environments(projects_file: &ProjectsFile, project_names: &[String]) -> Vec<String> {
     let matching_projects: Vec<&Project> = projects_file
         .projects
@@ -106,13 +107,9 @@ pub fn common_environments(projects_file: &ProjectsFile, project_names: &[String
 }
 
 /// Get the environment branch for a project by environment name.
-pub fn get_env_branch<'a>(project: &'a Project, env_name: &str) -> Option<&'a String> {
-    match env_name {
-        "test" => project.branches.test.as_ref(),
-        "staging" => project.branches.staging.as_ref(),
-        "prod" => project.branches.prod.as_ref(),
-        _ => None,
-    }
+#[allow(dead_code)]
+pub fn get_env_branch<'a>(project: &'a Project, env_name: &str) -> Option<&'a str> {
+    project.branches.get(env_name)
 }
 
 /// Resolve the worktree path for a workspace project.
@@ -130,6 +127,7 @@ pub fn resolve_worktree_path(
 mod tests {
     use super::*;
     use crate::config::{BranchConfig, Project, ProjectsFile};
+    use std::collections::BTreeMap;
     use tempfile::TempDir;
 
     fn make_project(name: &str, agents_md: Option<&str>, branches: BranchConfig) -> Project {
@@ -140,6 +138,7 @@ mod tests {
             order: 0,
             tags: Vec::new(),
             agents_md: agents_md.map(|s| s.to_string()),
+            branch_aliases: BTreeMap::new(),
             branches,
         }
     }
@@ -147,9 +146,7 @@ mod tests {
     fn default_branches() -> BranchConfig {
         BranchConfig {
             main: "main".to_string(),
-            test: None,
-            staging: None,
-            prod: None,
+            aliases: BTreeMap::new(),
         }
     }
 
@@ -230,9 +227,7 @@ mod tests {
                     None,
                     BranchConfig {
                         main: "main".to_string(),
-                        test: Some("test".to_string()),
-                        staging: None,
-                        prod: None,
+                        aliases: BTreeMap::from([("test".to_string(), "test".to_string())]),
                     },
                 ),
                 make_project(
@@ -240,9 +235,7 @@ mod tests {
                     None,
                     BranchConfig {
                         main: "main".to_string(),
-                        test: Some("develop".to_string()),
-                        staging: None,
-                        prod: None,
+                        aliases: BTreeMap::from([("test".to_string(), "develop".to_string())]),
                     },
                 ),
             ],
@@ -262,9 +255,7 @@ mod tests {
                     None,
                     BranchConfig {
                         main: "main".to_string(),
-                        test: Some("test".to_string()),
-                        staging: None,
-                        prod: None,
+                        aliases: BTreeMap::from([("test".to_string(), "test".to_string())]),
                     },
                 ),
                 make_project("b", None, default_branches()),

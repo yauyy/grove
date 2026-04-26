@@ -11,7 +11,8 @@ Grove 让你将多个本地 Git 仓库绑定在一起，统一创建工作分支
 - **多项目绑定** — 注册多个本地 Git 项目，按分组管理
 - **一键创建工作区** — 交互式多选项目，自动为每个项目创建 worktree 分支
 - **批量 Git 操作** — 一条命令同时对所有项目执行 add / commit / push / pull / merge
-- **环境分支管理** — 配置测试、预发、正式环境分支，一键合并发布
+- **分支预设与别名** — 全局配置常用分支选项，每个项目可映射到不同真实分支
+- **批量分支切换/创建** — `gswitch` 统一切换，`gcreate` 先 fetch，并基于各项目配置的 `origin/<main>` 创建，失败时回滚已创建分支
 - **工作区重命名** — 重命名工作区及对应分支，自动修复 worktree 链接
 - **AGENTS.md 合并** — 为每个项目配置 AI 代理描述，创建工作区时自动合并
 - **多语言支持** — 支持中文和英文界面，自动检测系统语言
@@ -62,7 +63,7 @@ grove add /path/to/backend
 
 - 选择分组（前端 / 后端 / 新建分组）
 - 输入主分支名（默认 master）
-- 配置环境分支（测试 / 预发 / 正式，可选）
+- 配置分支预设映射（测试 / 预发 / 正式，可选）
 - 自动校验分支是否存在于远程
 - 配置 agents.md（可选）
 
@@ -95,11 +96,11 @@ grove ga
 # 统一提交（所有项目用同一条消息）
 grove gc
 
-# 批量推送到远程同名分支
+# 推送当前或指定目标分支
 grove gp
 
-# 合并到测试环境
-grove gm
+# 合并工作分支到交互选择或指定目标分支
+grove gm test
 ```
 
 ### 4. 同步与管理
@@ -195,14 +196,36 @@ grove config edit workspaces # 编辑 workspaces.toml
 | 命令 | 别名 | 说明 |
 |------|------|------|
 | `grove sync` | `grove sy` | 同步远程主分支（fetch + merge） |
-| `grove gmerge` | `grove gm` | 合并工作分支到环境分支 |
+| `grove gswitch <target>` | `grove gsw <target>` | 所有项目切换到目标分支 |
+| `grove gcreate <name>` | `grove gcr <name>` | 先 fetch，所有项目基于配置的 `main` 对应远程起点 `origin/<main>` 创建并切换到新分支；失败时回滚已创建分支 |
 | `grove grename` | `grove grn` | 重命名所有项目的分支 |
 | `grove gstatus` | `grove gs` | 查看所有项目 git status |
 | `grove gadd` | `grove ga` | 所有项目 git add -A |
 | `grove gcommit` | `grove gc` | 统一提交消息 |
-| `grove gpush` | `grove gp` | 推送到远程同名分支 |
+| `grove gpush [target]` | `grove gp [target]` | 推送当前或指定分支 |
+| `grove gmerge [target]` | `grove gm [target]` | 合并工作分支到交互选择或指定目标分支 |
 | `grove gpull` | `grove gl` | 拉取远程更新 |
 | `grove gowork` | `grove gw` | 为当前工作区生成/更新 go.work |
+
+#### 示例输出
+
+```text
+gpush target: test
+
+✓ api: pushed test-master -> origin/test-master (target: test)
+✓ web: pushed develop -> origin/develop (target: test)
+
+2 succeeded, 0 failed
+```
+
+```text
+gmerge target: test
+
+✓ api: merged feature/login -> test-master (target: test)
+✓ web: merged feature/login -> develop (target: test)
+
+2 succeeded, 0 failed
+```
 
 ### 配置与工具
 
@@ -237,6 +260,12 @@ language = "zh"                   # 界面语言（en / zh）
 git_prefix = "feat-"              # Git 分支前缀（可选，默认为空）
 commit_message_tool = "manual"    # gcommit 提交信息来源
 auto_go_work = false              # 创建工作区后自动同步 go.work
+
+[branch_presets]
+test = "测试环境"
+staging = "预发环境"
+prod = "正式环境"
+master = "主分支"
 ```
 
 ### projects.toml
@@ -254,10 +283,14 @@ order = 0
 tags = ["go"]              # 可选；grove tags 可自动识别 go.mod 并补充
 
 [projects.branches]
-main = "main"
-test = "develop"           # 可选
-staging = "staging"        # 可选
-prod = "production"        # 可选
+main = "master"
+test = "test-master"
+staging = "pre"
+prod = "master"
+master = "main"
+
+[projects.branch_aliases]
+test-master = "test"
 ```
 
 ### workspaces.toml
@@ -319,7 +352,8 @@ Grove binds multiple local Git repositories together, creating unified work bran
 - **Multi-project binding** — Register multiple local Git projects, organized by groups
 - **One-click workspace creation** — Interactive multi-select, auto-creates worktree branches
 - **Batch Git operations** — Single command for add / commit / push / pull / merge across all projects
-- **Environment branch management** — Configure test / staging / production branches, merge with one command
+- **Branch presets and aliases** — Configure shared branch choices while each project maps them to its own real branch
+- **Batch branch switch/create** — `gswitch` switches all projects; `gcreate` fetches first, creates from each project's configured `origin/<main>`, and rolls back created branches on failure
 - **Workspace renaming** — Rename workspace and optionally its branch, auto-repairs worktree links
 - **AGENTS.md merging** — Per-project AI agent descriptions, auto-merged on workspace creation
 - **i18n support** — Chinese and English UI, auto-detects system locale
@@ -365,7 +399,7 @@ grove add /path/to/frontend
 grove add /path/to/backend
 ```
 
-Interactive prompts guide you through: group selection, main branch (default master), environment branches (optional), remote validation, agents.md (optional).
+Interactive prompts guide you through: group selection, main branch (default master), branch preset mappings (optional), remote validation, agents.md (optional).
 
 ### 2. Create a Workspace
 
@@ -377,7 +411,7 @@ grove -w create feature-login
 
 1. Space to multi-select projects → Enter
 2. Enter branch name (defaults to workspace name) → Enter
-3. Worktrees created automatically with `--no-track`
+3. Worktrees created automatically from remote main with `--no-track`
 
 ### 3. Batch Operations
 
@@ -387,8 +421,8 @@ cd ~/grove-workspaces/feature-login
 grove gs          # git status for all
 grove ga          # git add -A for all
 grove gc          # git commit (unified message)
-grove gp          # git push to remote
-grove gm          # merge to environment branch
+grove gp          # push current branch
+grove gm test     # merge work branch to target branch
 ```
 
 ### 4. Sync & Manage
@@ -427,6 +461,7 @@ grove tags
 
 grove config edit           # edit projects.toml
 grove config edit config    # edit config.toml
+grove config edit workspaces # edit workspaces.toml
 ```
 
 ## Command Reference
@@ -460,14 +495,36 @@ Commands are organized in three dimensions: **Project** (top-level), **Workspace
 | Command | Alias | Description |
 |---------|-------|-------------|
 | `grove sync` | `sy` | Sync remote main branch (fetch + merge) |
-| `grove gmerge` | `gm` | Merge to environment branch |
+| `grove gswitch <target>` | `grove gsw <target>` | Switch all projects to the target branch |
+| `grove gcreate <name>` | `grove gcr <name>` | Fetch first, then create and switch all projects from each configured `main` remote start point `origin/<main>`; roll back created branches on failure |
 | `grove grename` | `grn` | Rename branch across all projects |
 | `grove gstatus` | `gs` | Batch git status |
 | `grove gadd` | `ga` | Batch git add -A |
 | `grove gcommit` | `gc` | Batch git commit |
-| `grove gpush` | `gp` | Batch git push |
+| `grove gpush [target]` | `grove gp [target]` | Push the current or specified branch |
+| `grove gmerge [target]` | `grove gm [target]` | Merge the work branch to an interactive or specified target branch |
 | `grove gpull` | `gl` | Batch git pull |
 | `grove gowork` | `gw` | Generate/update go.work for the current workspace |
+
+#### Output Examples
+
+```text
+gpush target: test
+
+✓ api: pushed test-master -> origin/test-master (target: test)
+✓ web: pushed develop -> origin/develop (target: test)
+
+2 succeeded, 0 failed
+```
+
+```text
+gmerge target: test
+
+✓ api: merged feature/login -> test-master (target: test)
+✓ web: merged feature/login -> develop (target: test)
+
+2 succeeded, 0 failed
+```
 
 ### Configuration & Tools
 
@@ -502,6 +559,12 @@ language = "en"                   # UI language (en / zh)
 git_prefix = "feat-"              # Git branch prefix (optional, empty by default)
 commit_message_tool = "manual"    # gcommit message source
 auto_go_work = false              # Auto-sync go.work after workspace creation
+
+[branch_presets]
+test = "Test environment"
+staging = "Staging environment"
+prod = "Production environment"
+master = "Main branch"
 ```
 
 ### projects.toml
@@ -519,10 +582,14 @@ order = 0
 tags = ["go"]              # optional; grove tags can detect go.mod and backfill this
 
 [projects.branches]
-main = "main"
-test = "develop"           # optional
-staging = "staging"        # optional
-prod = "production"        # optional
+main = "master"
+test = "test-master"
+staging = "pre"
+prod = "master"
+master = "main"
+
+[projects.branch_aliases]
+test-master = "test"
 ```
 
 ### workspaces.toml

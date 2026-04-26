@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 
 /// Global configuration stored in ~/.grove/config.toml
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -12,6 +13,8 @@ pub struct GlobalConfig {
     pub commit_message_tool: String,
     #[serde(default)]
     pub auto_go_work: bool,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub branch_presets: BTreeMap<String, String>,
 }
 
 fn default_language() -> String {
@@ -41,6 +44,7 @@ impl Default for GlobalConfig {
             git_prefix: String::new(),
             commit_message_tool: default_commit_message_tool(),
             auto_go_work: false,
+            branch_presets: BTreeMap::new(),
         }
     }
 }
@@ -49,12 +53,28 @@ impl Default for GlobalConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BranchConfig {
     pub main: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub test: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub staging: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub prod: Option<String>,
+    #[serde(default, flatten)]
+    pub aliases: BTreeMap<String, String>,
+}
+
+impl BranchConfig {
+    pub fn get(&self, name: &str) -> Option<&str> {
+        if name == "main" {
+            Some(self.main.as_str())
+        } else {
+            self.aliases.get(name).map(String::as_str)
+        }
+    }
+
+    #[allow(dead_code)]
+    pub fn set_alias(&mut self, name: impl Into<String>, branch: impl Into<String>) -> bool {
+        let name = name.into();
+        if name.trim().is_empty() || name == "main" {
+            return false;
+        }
+        self.aliases.insert(name, branch.into());
+        true
+    }
 }
 
 /// A registered project
@@ -70,6 +90,8 @@ pub struct Project {
     pub tags: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub agents_md: Option<String>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub branch_aliases: BTreeMap<String, String>,
     pub branches: BranchConfig,
 }
 
@@ -77,6 +99,7 @@ pub struct Project {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Group {
     pub name: String,
+    #[serde(default)]
     pub order: u32,
 }
 
@@ -102,6 +125,7 @@ pub struct Workspace {
     pub name: String,
     pub branch: String,
     pub created_at: String,
+    #[serde(default)]
     pub projects: Vec<WorkspaceProject>,
 }
 
@@ -124,6 +148,7 @@ mod tests {
             git_prefix: String::new(),
             commit_message_tool: "manual".to_string(),
             auto_go_work: false,
+            branch_presets: BTreeMap::new(),
         };
         let toml_str = toml::to_string(&config).unwrap();
         let parsed: GlobalConfig = toml::from_str(&toml_str).unwrap();
@@ -150,11 +175,13 @@ mod tests {
                 order: 1,
                 tags: vec!["go".to_string()],
                 agents_md: Some("/home/user/api/agents.md".to_string()),
+                branch_aliases: BTreeMap::new(),
                 branches: BranchConfig {
                     main: "main".to_string(),
-                    test: Some("test".to_string()),
-                    staging: Some("staging".to_string()),
-                    prod: None,
+                    aliases: BTreeMap::from([
+                        ("test".to_string(), "test".to_string()),
+                        ("staging".to_string(), "staging".to_string()),
+                    ]),
                 },
             }],
         };
@@ -164,12 +191,9 @@ mod tests {
         assert_eq!(parsed.projects[0].name, "api");
         assert_eq!(parsed.projects[0].tags, vec!["go"]);
         assert_eq!(parsed.projects[0].branches.main, "main");
-        assert_eq!(parsed.projects[0].branches.test, Some("test".to_string()));
-        assert_eq!(
-            parsed.projects[0].branches.staging,
-            Some("staging".to_string())
-        );
-        assert_eq!(parsed.projects[0].branches.prod, None);
+        assert_eq!(parsed.projects[0].branches.get("test"), Some("test"));
+        assert_eq!(parsed.projects[0].branches.get("staging"), Some("staging"));
+        assert_eq!(parsed.projects[0].branches.get("prod"), None);
         assert_eq!(parsed.groups.len(), 1);
         assert_eq!(parsed.groups[0].name, "backend");
     }
@@ -204,17 +228,141 @@ mod tests {
     }
 
     #[test]
+    fn test_group_order_defaults_to_zero() {
+        let toml_str = r#"
+[[groups]]
+name = "frontend"
+"#;
+
+        let parsed: ProjectsFile = toml::from_str(toml_str).unwrap();
+
+        assert_eq!(parsed.groups.len(), 1);
+        assert_eq!(parsed.groups[0].name, "frontend");
+        assert_eq!(parsed.groups[0].order, 0);
+    }
+
+    #[test]
+    fn test_workspace_projects_defaults_to_empty() {
+        let toml_str = r#"
+[[workspaces]]
+name = "feature-x"
+branch = "feature/x"
+created_at = "2024-01-01T00:00:00Z"
+"#;
+
+        let parsed: WorkspacesFile = toml::from_str(toml_str).unwrap();
+
+        assert_eq!(parsed.workspaces.len(), 1);
+        assert_eq!(parsed.workspaces[0].name, "feature-x");
+        assert!(parsed.workspaces[0].projects.is_empty());
+    }
+
+    #[test]
+    fn test_legacy_project_config_defaults_missing_fields() {
+        let toml_str = r#"
+[[projects]]
+name = "api"
+path = "/tmp/api"
+
+[projects.branches]
+main = "main"
+test = "test-master"
+staging = "pre"
+prod = "master"
+"#;
+
+        let parsed: ProjectsFile = toml::from_str(toml_str).unwrap();
+        let project = &parsed.projects[0];
+
+        assert!(project.tags.is_empty());
+        assert!(project.branch_aliases.is_empty());
+        assert_eq!(project.branches.get("test"), Some("test-master"));
+        assert_eq!(project.branches.get("staging"), Some("pre"));
+        assert_eq!(project.branches.get("prod"), Some("master"));
+    }
+
+    #[test]
     fn test_branch_config_optional_fields_omitted_in_toml() {
         let bc = BranchConfig {
             main: "main".to_string(),
-            test: None,
-            staging: None,
-            prod: None,
+            aliases: BTreeMap::new(),
         };
         let toml_str = toml::to_string(&bc).unwrap();
         assert!(!toml_str.contains("test"));
         assert!(!toml_str.contains("staging"));
         assert!(!toml_str.contains("prod"));
         assert!(toml_str.contains("main"));
+    }
+
+    #[test]
+    fn test_branch_config_accepts_extra_mappings() {
+        let toml_str = r#"
+main = "master"
+test = "test-master"
+staging = "pre"
+prod = "master"
+master = "main"
+"#;
+
+        let parsed: BranchConfig = toml::from_str(toml_str).unwrap();
+
+        assert_eq!(parsed.main, "master");
+        assert_eq!(parsed.get("test"), Some("test-master"));
+        assert_eq!(parsed.get("staging"), Some("pre"));
+        assert_eq!(parsed.get("prod"), Some("master"));
+        assert_eq!(parsed.get("master"), Some("main"));
+        assert_eq!(parsed.get("missing"), None);
+    }
+
+    #[test]
+    fn test_branch_config_set_alias_rejects_invalid_names() {
+        let mut branches = BranchConfig {
+            main: "master".to_string(),
+            aliases: BTreeMap::new(),
+        };
+
+        assert!(branches.set_alias("test", "test-master"));
+        assert_eq!(branches.get("test"), Some("test-master"));
+
+        assert!(!branches.set_alias("main", "develop"));
+        assert_eq!(branches.main, "master");
+        assert!(!branches.aliases.contains_key("main"));
+
+        assert!(!branches.set_alias("", "x"));
+    }
+
+    #[test]
+    fn test_project_branch_aliases_roundtrip() {
+        let pf = ProjectsFile {
+            groups: Vec::new(),
+            projects: vec![Project {
+                name: "api".to_string(),
+                path: "/tmp/api".to_string(),
+                group: String::new(),
+                order: 0,
+                tags: Vec::new(),
+                agents_md: None,
+                branch_aliases: std::collections::BTreeMap::from([(
+                    "test-master".to_string(),
+                    "test".to_string(),
+                )]),
+                branches: BranchConfig {
+                    main: "master".to_string(),
+                    aliases: std::collections::BTreeMap::from([(
+                        "test".to_string(),
+                        "test-master".to_string(),
+                    )]),
+                },
+            }],
+        };
+
+        let toml_str = toml::to_string(&pf).unwrap();
+        let parsed: ProjectsFile = toml::from_str(&toml_str).unwrap();
+
+        assert_eq!(
+            parsed.projects[0].branch_aliases.get("test-master"),
+            Some(&"test".to_string())
+        );
+        assert_eq!(parsed.projects[0].branches.get("test"), Some("test-master"));
     }
 }

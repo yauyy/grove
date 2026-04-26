@@ -1,11 +1,24 @@
 use assert_cmd::Command;
 use predicates::prelude::*;
 
+fn workspace_context_failure() -> impl Predicate<str> {
+    predicate::str::contains("No workspaces")
+        .or(predicate::str::contains("暂无工作区"))
+        .or(predicate::str::contains("not a terminal"))
+}
+
+fn grove_cmd() -> (tempfile::TempDir, Command) {
+    let home = tempfile::tempdir().unwrap();
+    let mut cmd = Command::cargo_bin("grove").unwrap();
+    cmd.env("HOME", home.path());
+    (home, cmd)
+}
+
 #[test]
 fn test_help_output() {
-    Command::cargo_bin("grove")
-        .unwrap()
-        .arg("help")
+    let (_home, mut cmd) = grove_cmd();
+
+    cmd.arg("help")
         .assert()
         .success()
         .stdout(predicate::str::contains(
@@ -15,32 +28,30 @@ fn test_help_output() {
 
 #[test]
 fn test_no_args_shows_help() {
-    Command::cargo_bin("grove").unwrap().assert().success();
+    let (_home, mut cmd) = grove_cmd();
+
+    cmd.assert().success();
 }
 
 #[test]
 fn test_list_empty() {
-    Command::cargo_bin("grove")
-        .unwrap()
-        .arg("list")
-        .assert()
-        .success();
+    let (_home, mut cmd) = grove_cmd();
+
+    cmd.arg("list").assert().success();
 }
 
 #[test]
 fn test_status_empty() {
-    Command::cargo_bin("grove")
-        .unwrap()
-        .args(["-w", "status"])
-        .assert()
-        .success();
+    let (_home, mut cmd) = grove_cmd();
+
+    cmd.args(["-w", "status"]).assert().success();
 }
 
 #[test]
 fn test_config_list() {
-    Command::cargo_bin("grove")
-        .unwrap()
-        .args(["config", "list"])
+    let (_home, mut cmd) = grove_cmd();
+
+    cmd.args(["config", "list"])
         .assert()
         .success()
         .stdout(predicate::str::contains("workpath"));
@@ -48,45 +59,77 @@ fn test_config_list() {
 
 #[test]
 fn test_completion_bash() {
-    Command::cargo_bin("grove")
-        .unwrap()
-        .args(["completion", "bash"])
-        .assert()
-        .success();
+    let (_home, mut cmd) = grove_cmd();
+
+    cmd.args(["completion", "bash"]).assert().success();
 }
 
 #[test]
 fn test_completion_zsh() {
-    Command::cargo_bin("grove")
-        .unwrap()
-        .args(["completion", "zsh"])
-        .assert()
-        .success();
+    let (_home, mut cmd) = grove_cmd();
+
+    cmd.args(["completion", "zsh"]).assert().success();
 }
 
 #[test]
 fn test_add_invalid_path() {
-    Command::cargo_bin("grove")
-        .unwrap()
-        .args(["add", "/nonexistent/path/that/does/not/exist"])
+    let (_home, mut cmd) = grove_cmd();
+
+    cmd.args(["add", "/nonexistent/path/that/does/not/exist"])
         .assert()
         .failure();
 }
 
 #[test]
 fn test_aliases_ls() {
-    Command::cargo_bin("grove")
-        .unwrap()
-        .arg("ls")
-        .assert()
-        .success();
+    let (_home, mut cmd) = grove_cmd();
+
+    cmd.arg("ls").assert().success();
 }
 
 #[test]
 fn test_aliases_st() {
-    Command::cargo_bin("grove")
-        .unwrap()
-        .args(["-w", "st"])
+    let (_home, mut cmd) = grove_cmd();
+
+    cmd.args(["-w", "st"]).assert().success();
+}
+
+#[test]
+fn test_gpush_accepts_optional_target() {
+    let (_home, mut cmd) = grove_cmd();
+
+    cmd.args(["gpush", "test"])
         .assert()
-        .success();
+        .code(1)
+        .stderr(workspace_context_failure());
+}
+
+#[test]
+fn test_gmerge_accepts_optional_target() {
+    let (_home, mut cmd) = grove_cmd();
+
+    cmd.args(["gmerge", "test"])
+        .assert()
+        .code(1)
+        .stderr(workspace_context_failure());
+}
+
+#[test]
+fn test_gswitch_command_exists() {
+    let (_home, mut cmd) = grove_cmd();
+
+    cmd.args(["gswitch", "test"])
+        .assert()
+        .code(1)
+        .stderr(workspace_context_failure());
+}
+
+#[test]
+fn test_gcreate_command_exists() {
+    let (_home, mut cmd) = grove_cmd();
+
+    cmd.args(["gcreate", "feature-x"])
+        .assert()
+        .code(1)
+        .stderr(workspace_context_failure());
 }

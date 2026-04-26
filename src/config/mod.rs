@@ -4,6 +4,7 @@ pub use models::*;
 
 use anyhow::{Context, Result};
 use chrono::{Datelike, Local, NaiveDate};
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::PathBuf;
 
@@ -88,6 +89,38 @@ pub fn save_workspaces(wf: &WorkspacesFile) -> Result<()> {
     let content = toml::to_string(wf).context("Failed to serialize workspaces file")?;
     fs::write(&path, content).with_context(|| format!("Failed to write {}", path.display()))?;
     Ok(())
+}
+
+pub fn default_branch_presets() -> BTreeMap<String, String> {
+    BTreeMap::from([
+        ("test".to_string(), "Test branch".to_string()),
+        ("staging".to_string(), "Staging branch".to_string()),
+        ("prod".to_string(), "Prod branch".to_string()),
+    ])
+}
+
+pub fn effective_branch_presets(config: &GlobalConfig) -> BTreeMap<String, String> {
+    if config.branch_presets.is_empty() {
+        default_branch_presets()
+    } else {
+        config.branch_presets.clone()
+    }
+}
+
+pub fn effective_branch_preset_entries(config: &GlobalConfig) -> Vec<(String, String)> {
+    if config.branch_presets.is_empty() {
+        vec![
+            ("test".to_string(), "Test branch".to_string()),
+            ("staging".to_string(), "Staging branch".to_string()),
+            ("prod".to_string(), "Prod branch".to_string()),
+        ]
+    } else {
+        config
+            .branch_presets
+            .iter()
+            .map(|(name, description)| (name.clone(), description.clone()))
+            .collect()
+    }
 }
 
 /// Resolves a workpath string, expanding ~ to the user's home directory.
@@ -187,6 +220,25 @@ mod tests {
     }
 
     #[test]
+    fn test_default_branch_presets_include_current_environments() {
+        let presets = default_branch_presets();
+
+        assert_eq!(presets.get("test"), Some(&"Test branch".to_string()));
+        assert_eq!(presets.get("staging"), Some(&"Staging branch".to_string()));
+        assert_eq!(presets.get("prod"), Some(&"Prod branch".to_string()));
+    }
+
+    #[test]
+    fn test_effective_branch_preset_entries_defaults_to_safe_menu_order() {
+        let config = GlobalConfig::default();
+
+        let entries = effective_branch_preset_entries(&config);
+        let keys: Vec<&str> = entries.iter().map(|(key, _)| key.as_str()).collect();
+
+        assert_eq!(keys, vec!["test", "staging", "prod"]);
+    }
+
+    #[test]
     fn test_save_and_load_projects_file() {
         let tmp = tempfile::tempdir().unwrap();
         let projects_path = tmp.path().join("projects.toml");
@@ -203,11 +255,10 @@ mod tests {
                 order: 0,
                 tags: Vec::new(),
                 agents_md: None,
+                branch_aliases: BTreeMap::new(),
                 branches: BranchConfig {
                     main: "main".to_string(),
-                    test: Some("develop".to_string()),
-                    staging: None,
-                    prod: None,
+                    aliases: BTreeMap::from([("test".to_string(), "develop".to_string())]),
                 },
             }],
         };
@@ -224,10 +275,7 @@ mod tests {
         assert_eq!(loaded.groups[0].name, "frontend");
         assert_eq!(loaded.projects.len(), 1);
         assert_eq!(loaded.projects[0].name, "web-app");
-        assert_eq!(
-            loaded.projects[0].branches.test,
-            Some("develop".to_string())
-        );
-        assert_eq!(loaded.projects[0].branches.staging, None);
+        assert_eq!(loaded.projects[0].branches.get("test"), Some("develop"));
+        assert_eq!(loaded.projects[0].branches.get("staging"), None);
     }
 }

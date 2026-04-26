@@ -1,4 +1,5 @@
 use anyhow::{bail, Result};
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use crate::config::{self, BranchConfig, Group, Project};
@@ -127,11 +128,17 @@ pub fn run(path: &str) -> Result<()> {
         order,
         tags: detect_project_tags(&resolved),
         agents_md,
+        branch_aliases: BTreeMap::new(),
         branches: BranchConfig {
             main: main_branch,
-            test: test_branch,
-            staging: staging_branch,
-            prod: prod_branch,
+            aliases: [
+                ("test", test_branch),
+                ("staging", staging_branch),
+                ("prod", prod_branch),
+            ]
+            .into_iter()
+            .filter_map(|(name, branch)| branch.map(|branch| (name.to_string(), branch)))
+            .collect(),
         },
     };
 

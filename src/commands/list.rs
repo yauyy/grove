@@ -69,13 +69,13 @@ fn format_project_line(project: &config::Project, dim: &Style, tag_style: &Style
     let mut branch_info = project.branches.main.clone();
 
     let mut env_parts: Vec<String> = Vec::new();
-    if let Some(ref t) = project.branches.test {
+    if let Some(t) = project.branches.get("test") {
         env_parts.push(format!("test:{}", t));
     }
-    if let Some(ref s) = project.branches.staging {
+    if let Some(s) = project.branches.get("staging") {
         env_parts.push(format!("stg:{}", s));
     }
-    if let Some(ref p) = project.branches.prod {
+    if let Some(p) = project.branches.get("prod") {
         env_parts.push(format!("prod:{}", p));
     }
     if !env_parts.is_empty() {
@@ -116,11 +116,10 @@ mod tests {
             order: 0,
             tags: tags.into_iter().map(str::to_string).collect(),
             agents_md: None,
+            branch_aliases: std::collections::BTreeMap::new(),
             branches: config::BranchConfig {
                 main: "main".to_string(),
-                test: None,
-                staging: None,
-                prod: None,
+                aliases: std::collections::BTreeMap::new(),
             },
         }
     }

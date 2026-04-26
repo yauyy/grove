@@ -1,3 +1,4 @@
+mod branch_target;
 mod commands;
 mod config;
 mod git;
@@ -61,7 +62,10 @@ enum Commands {
 
     /// Merge current branch into environment for all projects
     #[command(alias = "gm")]
-    Gmerge,
+    Gmerge {
+        /// Target preset, alias, logical branch, or real branch
+        target: Option<String>,
+    },
 
     /// Rename branch for all projects in a workspace
     #[command(alias = "grn")]
@@ -81,7 +85,24 @@ enum Commands {
 
     /// Push all projects
     #[command(alias = "gp")]
-    Gpush,
+    Gpush {
+        /// Target preset, alias, logical branch, or real branch
+        target: Option<String>,
+    },
+
+    /// Switch all projects to a target branch
+    #[command(alias = "gsw")]
+    Gswitch {
+        /// Target preset, alias, logical branch, or real branch
+        target: String,
+    },
+
+    /// Create and switch to a new branch in all projects
+    #[command(alias = "gcr")]
+    Gcreate {
+        /// New branch name, git-prefix is applied if configured
+        name: String,
+    },
 
     /// Pull all projects
     #[command(alias = "gl")]
@@ -180,12 +201,14 @@ fn main() -> anyhow::Result<()> {
         },
         Some(Commands::Move { ref project }) => commands::mov::run(project.clone()),
         Some(Commands::Sync) => commands::sync::run(),
-        Some(Commands::Gmerge) => commands::git_ops::gmerge(),
+        Some(Commands::Gmerge { ref target }) => commands::git_ops::gmerge(target.clone()),
         Some(Commands::Grename) => commands::rename::grename(),
         Some(Commands::Gstatus) => commands::git_ops::gstatus(),
         Some(Commands::Gadd) => commands::git_ops::gadd(),
         Some(Commands::Gcommit) => commands::git_ops::gcommit(),
-        Some(Commands::Gpush) => commands::git_ops::gpush(),
+        Some(Commands::Gpush { ref target }) => commands::git_ops::gpush(target.clone()),
+        Some(Commands::Gswitch { ref target }) => commands::git_ops::gswitch(target),
+        Some(Commands::Gcreate { ref name }) => commands::git_ops::gcreate(name),
         Some(Commands::Gpull) => commands::git_ops::gpull(),
         Some(Commands::Gowork) => commands::gowork::run(),
         Some(Commands::Tags) => commands::tags::run(),

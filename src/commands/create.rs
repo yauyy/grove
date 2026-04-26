@@ -140,7 +140,17 @@ pub fn run(name: Option<String>) -> Result<()> {
         let _ = git::fetch(repo_dir);
 
         // c. git worktree add (prefer remote latest)
-        let start_point = git::resolve_remote_start_point(repo_dir, &project.branches.main);
+        let start_point = match git::resolve_remote_start_point(repo_dir, &project.branches.main) {
+            Ok(start_point) => start_point,
+            Err(e) => {
+                ui::error(&format!(
+                    "Failed to resolve start point for '{}': {}",
+                    project.name, e
+                ));
+                failed += 1;
+                continue;
+            }
+        };
         match git::worktree_add(repo_dir, &wt_path, &branch, &start_point) {
             Ok(()) => {
                 ws_projects.push(WorkspaceProject {

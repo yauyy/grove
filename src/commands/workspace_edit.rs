@@ -144,8 +144,9 @@ pub fn run(name: Option<String>) -> Result<()> {
             let result = if git::branch_exists(repo_dir, &branch).unwrap_or(false) {
                 git::worktree_add_existing(repo_dir, &wt_path, &branch)
             } else {
-                let start_point = git::resolve_remote_start_point(repo_dir, &project.branches.main);
-                git::worktree_add(repo_dir, &wt_path, &branch, &start_point)
+                git::resolve_remote_start_point(repo_dir, &project.branches.main).and_then(
+                    |start_point| git::worktree_add(repo_dir, &wt_path, &branch, &start_point),
+                )
             };
             match result {
                 Ok(()) => {

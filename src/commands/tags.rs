@@ -44,11 +44,10 @@ mod tests {
             order: 0,
             tags: tags.into_iter().map(str::to_string).collect(),
             agents_md: None,
+            branch_aliases: std::collections::BTreeMap::new(),
             branches: config::BranchConfig {
                 main: "main".to_string(),
-                test: None,
-                staging: None,
-                prod: None,
+                aliases: std::collections::BTreeMap::new(),
             },
         }
     }

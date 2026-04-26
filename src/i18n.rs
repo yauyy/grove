@@ -1,12 +1,20 @@
 use std::collections::HashMap;
 
+#[cfg(not(test))]
 use crate::config;
 
 /// Get current language from config, fallback to "en"
+#[cfg(not(test))]
 pub fn current_lang() -> String {
     config::load_global_config()
         .map(|c| c.language)
         .unwrap_or_else(|_| "en".to_string())
+}
+
+/// Unit tests should not depend on the developer's ~/.grove language setting.
+#[cfg(test)]
+pub fn current_lang() -> String {
+    "en".to_string()
 }
 
 /// Get a translated string by key
@@ -137,7 +145,7 @@ fn en() -> HashMap<&'static str, &'static str> {
     );
     m.insert(
         "rename_confirm",
-        "Rename branch from '{}' to '{}' in {} project(s)?",
+        "Rename branch in {} project(s) from '{}' to '{}'?",
     );
     m.insert(
         "workspace_branch_renamed",
@@ -173,6 +181,12 @@ fn en() -> HashMap<&'static str, &'static str> {
         "No common environment branch configured across all workspace projects.",
     );
     m.insert("missing_envs", "{}: missing environments: {}");
+    m.insert("branch_target", "Branch target");
+    m.insert("precheck_failed", "Precheck failed for {} project(s)");
+    m.insert("switch_success", "{}: switched {} -> {} (target: {})");
+    m.insert("create_success", "{}: created {} from {}");
+    m.insert("push_success", "{}: pushed {} -> origin/{} (target: {})");
+    m.insert("merge_success", "{}: merged {} -> {} (target: {})");
 
     // workspace edit
     m.insert(
@@ -349,6 +363,12 @@ fn zh() -> HashMap<&'static str, &'static str> {
     m.insert("merge_to_env", "合并到哪个环境？");
     m.insert("no_common_env", "所有工作区项目中没有共同配置的环境分支。");
     m.insert("missing_envs", "{}: 缺少环境配置: {}");
+    m.insert("branch_target", "分支目标");
+    m.insert("precheck_failed", "{} 个项目预检查失败");
+    m.insert("switch_success", "{}: 已从 {} 切换到 {} (target: {})");
+    m.insert("create_success", "{}: 已创建 {}，起点 {}");
+    m.insert("push_success", "{}: 已推送 {} -> origin/{} (target: {})");
+    m.insert("merge_success", "{}: 已合并 {} -> {} (target: {})");
 
     // workspace edit
     m.insert(
@@ -369,7 +389,7 @@ fn zh() -> HashMap<&'static str, &'static str> {
     m.insert("project_moved", "项目 '{}' 已移动到 '{}'。");
 
     // grove config
-    m.insert("config_edit_opening", "正在使用 {} 打开 {}");
+    m.insert("config_edit_opening", "正在打开 {}，使用编辑器 {}");
     m.insert("config_edited", "{} 编辑完成");
     m.insert(
         "workpath_forward_only",
@@ -391,4 +411,36 @@ fn zh() -> HashMap<&'static str, &'static str> {
     m.insert("placeholder_group_name", "例如 frontend");
 
     m
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn templates_match_replacement_order() {
+        let en = get_translations("en");
+        let zh = get_translations("zh");
+
+        assert_eq!(
+            en["rename_confirm"]
+                .replacen("{}", "2", 1)
+                .replacen("{}", "main", 1)
+                .replacen("{}", "feature", 1),
+            "Rename branch in 2 project(s) from 'main' to 'feature'?"
+        );
+        assert_eq!(
+            zh["rename_confirm"]
+                .replacen("{}", "2", 1)
+                .replacen("{}", "main", 1)
+                .replacen("{}", "feature", 1),
+            "是否将 2 个项目的分支从 'main' 重命名为 'feature'？"
+        );
+        assert_eq!(
+            zh["config_edit_opening"]
+                .replacen("{}", "config.toml", 1)
+                .replacen("{}", "vim", 1),
+            "正在打开 config.toml，使用编辑器 vim"
+        );
+    }
 }
