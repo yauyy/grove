@@ -27,6 +27,12 @@ pub fn sync_workspace(ws: &Workspace, projects: &[(WorkspaceProject, Project)]) 
         return Ok(());
     }
 
+    if go_projects.len() < 2 {
+        remove_go_work_files(&ws_dir)?;
+        ui::info("Only one Go project in this workspace; skipping go.work");
+        return Ok(());
+    }
+
     let project_paths: Vec<PathBuf> = go_projects
         .iter()
         .map(|(wp, _)| PathBuf::from(&wp.worktree_path))
@@ -128,10 +134,19 @@ fn build_go_work_init_args(workspace_dir: &Path, project_paths: &[PathBuf]) -> V
 }
 
 fn go_work_use_path(workspace_dir: &Path, project_path: &Path) -> String {
-    match project_path.strip_prefix(workspace_dir) {
-        Ok(relative) => format!("./{}", relative.to_string_lossy().replace('\\', "/")),
-        Err(_) => project_path.to_string_lossy().replace('\\', "/"),
+    if let Ok(relative) = project_path.strip_prefix(workspace_dir) {
+        return format!("./{}", relative.to_string_lossy().replace('\\', "/"));
     }
+
+    let canonical_ws = fs::canonicalize(workspace_dir).ok();
+    let canonical_proj = fs::canonicalize(project_path).ok();
+    if let (Some(ws), Some(proj)) = (canonical_ws, canonical_proj) {
+        if let Ok(relative) = proj.strip_prefix(&ws) {
+            return format!("./{}", relative.to_string_lossy().replace('\\', "/"));
+        }
+    }
+
+    project_path.to_string_lossy().replace('\\', "/")
 }
 
 fn remove_go_work_files(workspace_dir: &Path) -> Result<()> {
@@ -246,6 +261,23 @@ mod tests {
         };
 
         assert!(project_is_go_project(tmp.path(), &project));
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn test_go_work_use_path_resolves_symlinked_workspace_dir() {
+        use std::os::unix::fs::symlink;
+
+        let tmp = tempfile::tempdir().unwrap();
+        let real_ws = tmp.path().join("real_ws");
+        fs::create_dir_all(real_ws.join("common")).unwrap();
+        fs::create_dir_all(real_ws.join("client")).unwrap();
+
+        let link_ws = tmp.path().join("link_ws");
+        symlink(&real_ws, &link_ws).unwrap();
+
+        let path = go_work_use_path(&link_ws, &real_ws.join("common"));
+        assert_eq!(path, "./common");
     }
 
     #[test]
