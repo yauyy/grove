@@ -1,7 +1,7 @@
 class Grove < Formula
   desc "Multi-project git worktree workspace manager"
   homepage "https://github.com/yauyy/grove"
-  version "0.5.0"
+  version "0.6.0"
   license "MIT"
 
   on_macos do

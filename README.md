@@ -139,8 +139,8 @@ grove config set git-prefix feat-
 # 例如：工作区名 login → 分支名默认 feat-login
 
 # 日期模板会按当天展开
-grove config set git-prefix 'feature/ymy/[YYYYMMDD]/'
-# 例如：2026-04-24 创建 login → feature/ymy/20260424/login
+grove config set git-prefix 'feature/alice/[YYYYMMDD]/'
+# 例如：2026-04-24 创建 login → feature/alice/20260424/login
 
 # 设置 gcommit 提交信息来源（manual/codex/claude/copilot/cursor）
 grove config set commit-message-tool codex
@@ -202,29 +202,59 @@ grove config edit workspaces # 编辑 workspaces.toml
 | `grove gstatus` | `grove gs` | 查看所有项目 git status |
 | `grove gadd` | `grove ga` | 所有项目 git add -A |
 | `grove gcommit` | `grove gc` | 统一提交消息 |
-| `grove gpush [target]` | `grove gp [target]` | 推送当前或指定分支 |
-| `grove gmerge [target]` | `grove gm [target]` | 合并工作分支到交互选择或指定目标分支 |
-| `grove gpull` | `grove gl` | 拉取远程更新 |
+| `grove gpush [target]` | `grove gp [target]` | 推送当前或指定分支；先 `git fetch`，无新提交跳过、本地落后会报错 |
+| `grove gmerge [target] [-p/--push]` | `grove gm [target] [-p]` | 合并工作分支到交互选择或指定目标分支；源分支无新提交时跳过、冲突时自动 `merge --abort`；加 `--push` 合并后推送目标分支到 origin |
+| `grove gpull` | `grove gl` | 拉取远程更新（`--ff-only`） |
 | `grove gowork` | `grove gw` | 为当前工作区生成/更新 go.work |
 
 #### 示例输出
+
+`gpush`：fetch 后逐项目检查与 `origin/<branch>` 的差异，无新提交跳过、落后则报错。
 
 ```text
 gpush target: test
 
 ✓ api: pushed test-master -> origin/test-master (target: test)
-✓ web: pushed develop -> origin/develop (target: test)
+ℹ web: 已跳过，develop 相对 origin/develop 没有新提交 (target: test)
 
-2 succeeded, 0 failed
+成功 1，失败 0，跳过 1
 ```
+
+`gmerge`：源分支无新提交时跳过；冲突时自动 `merge --abort` 并切回原分支。
 
 ```text
 gmerge target: test
 
-✓ api: merged feature/login -> test-master (target: test)
-✓ web: merged feature/login -> develop (target: test)
+✓ api: 已合并 feature/login -> test-master (target: test)
+ℹ web: 已跳过，feature/login 相对 develop 没有新提交 (target: test)
 
-2 succeeded, 0 failed
+成功 1，失败 0，跳过 1
+```
+
+`gmerge --push`：合并成功后顺带把目标分支推到 origin。
+
+```text
+gmerge target: test (with --push)
+
+✓ api: 已合并 feature/login -> test-master (target: test)
+✓ api: 已推送 test-master -> origin/test-master (target: test)
+
+成功 1，失败 0
+```
+
+`gstatus`：每个项目额外显示当前分支以及和 `origin/<branch>` 的领先/落后情况。
+
+```text
+api
+  分支：feature/login
+  对比 origin/feature/login：领先 2
+  M  src/auth.rs
+  ?? notes.md
+
+web
+  分支：feature/login
+  与 origin/feature/login 同步
+  工作区干净
 ```
 
 ### 配置与工具
@@ -447,8 +477,8 @@ grove config set git-prefix feat-
 # e.g. workspace "login" → branch defaults to "feat-login"
 
 # Date templates are expanded using today's date
-grove config set git-prefix 'feature/ymy/[YYYYMMDD]/'
-# e.g. on 2026-04-24 workspace "login" → "feature/ymy/20260424/login"
+grove config set git-prefix 'feature/alice/[YYYYMMDD]/'
+# e.g. on 2026-04-24 workspace "login" → "feature/alice/20260424/login"
 
 # Set gcommit message source (manual/codex/claude/copilot/cursor)
 grove config set commit-message-tool codex
@@ -501,29 +531,59 @@ Commands are organized in three dimensions: **Project** (top-level), **Workspace
 | `grove gstatus` | `gs` | Batch git status |
 | `grove gadd` | `ga` | Batch git add -A |
 | `grove gcommit` | `gc` | Batch git commit |
-| `grove gpush [target]` | `grove gp [target]` | Push the current or specified branch |
-| `grove gmerge [target]` | `grove gm [target]` | Merge the work branch to an interactive or specified target branch |
-| `grove gpull` | `gl` | Batch git pull |
+| `grove gpush [target]` | `grove gp [target]` | Push the current or specified branch; runs `git fetch` first, skips when there are no new commits, fails fast when local is behind |
+| `grove gmerge [target] [-p/--push]` | `grove gm [target] [-p]` | Merge the work branch to an interactive or specified target branch; skips when source has no new commits, auto-aborts on conflict; with `--push` also pushes the target branch to origin |
+| `grove gpull` | `gl` | Batch git pull (`--ff-only`) |
 | `grove gowork` | `gw` | Generate/update go.work for the current workspace |
 
 #### Output Examples
+
+`gpush`: fetches first, then per project compares with `origin/<branch>`. Up-to-date branches are skipped; if the local branch is behind, push is refused.
 
 ```text
 gpush target: test
 
 ✓ api: pushed test-master -> origin/test-master (target: test)
-✓ web: pushed develop -> origin/develop (target: test)
+ℹ web: skipped, develop has no new commits over origin/develop (target: test)
 
-2 succeeded, 0 failed
+1 succeeded, 0 failed, 1 skipped
 ```
+
+`gmerge`: skips projects whose source branch has no new commits; on conflict, runs `merge --abort` automatically and checks the original branch back out.
 
 ```text
 gmerge target: test
 
 ✓ api: merged feature/login -> test-master (target: test)
-✓ web: merged feature/login -> develop (target: test)
+ℹ web: skipped, feature/login has no new commits over develop (target: test)
 
-2 succeeded, 0 failed
+1 succeeded, 0 failed, 1 skipped
+```
+
+`gmerge --push`: after a successful merge, also pushes the target branch to origin.
+
+```text
+gmerge target: test (with --push)
+
+✓ api: merged feature/login -> test-master (target: test)
+✓ api: pushed test-master -> origin/test-master (target: test)
+
+1 succeeded, 0 failed
+```
+
+`gstatus`: each project additionally shows the current branch and ahead/behind status against `origin/<branch>`.
+
+```text
+api
+  branch: feature/login
+  vs origin/feature/login: 2 ahead
+  M  src/auth.rs
+  ?? notes.md
+
+web
+  branch: feature/login
+  in sync with origin/feature/login
+  Working tree clean
 ```
 
 ### Configuration & Tools

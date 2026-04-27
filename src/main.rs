@@ -65,6 +65,9 @@ enum Commands {
     Gmerge {
         /// Target preset, alias, logical branch, or real branch
         target: Option<String>,
+        /// After a successful merge, also push the target branch to origin
+        #[arg(short = 'p', long = "push")]
+        push: bool,
     },
 
     /// Rename branch for all projects in a workspace
@@ -201,7 +204,9 @@ fn main() -> anyhow::Result<()> {
         },
         Some(Commands::Move { ref project }) => commands::mov::run(project.clone()),
         Some(Commands::Sync) => commands::sync::run(),
-        Some(Commands::Gmerge { ref target }) => commands::git_ops::gmerge(target.clone()),
+        Some(Commands::Gmerge { ref target, push }) => {
+            commands::git_ops::gmerge(target.clone(), push)
+        }
         Some(Commands::Grename) => commands::rename::grename(),
         Some(Commands::Gstatus) => commands::git_ops::gstatus(),
         Some(Commands::Gadd) => commands::git_ops::gadd(),

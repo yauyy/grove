@@ -28,7 +28,7 @@ pub fn run() -> Result<()> {
 
         let result = (|| -> Result<()> {
             git::fetch(wt_path)?;
-            git::merge(wt_path, &remote_main)?;
+            git::merge_ff_only(wt_path, &remote_main)?;
             Ok(())
         })();
 

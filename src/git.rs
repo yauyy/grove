@@ -252,9 +252,18 @@ pub fn push_upstream(dir: &Path, branch: &str) -> Result<()> {
     Ok(())
 }
 
-/// Pull from remote.
+/// Push a specific branch to origin without changing the current checkout.
+/// Uses the `<branch>:<branch>` refspec so the source ref is unambiguous and
+/// the operation never relies on the current HEAD.
+pub fn push_branch(dir: &Path, branch: &str) -> Result<()> {
+    let refspec = format!("{}:{}", branch, branch);
+    run_git_checked(dir, &["push", "origin", &refspec])?;
+    Ok(())
+}
+
+/// Pull from remote using fast-forward only to avoid surprise merge commits.
 pub fn pull(dir: &Path) -> Result<()> {
-    run_git_checked(dir, &["pull"])?;
+    run_git_checked(dir, &["pull", "--ff-only"])?;
     Ok(())
 }
 
@@ -272,8 +281,49 @@ pub fn status_short(dir: &Path) -> Result<String> {
 
 /// Merge a branch into the current branch.
 pub fn merge(dir: &Path, branch: &str) -> Result<()> {
-    run_git_checked(dir, &["merge", branch])?;
+    run_git_checked(dir, &["merge", "--no-edit", branch])?;
     Ok(())
+}
+
+/// Merge a branch into the current branch using fast-forward only.
+/// Fails if the merge would require a real merge commit, leaving the
+/// worktree untouched.
+pub fn merge_ff_only(dir: &Path, branch: &str) -> Result<()> {
+    run_git_checked(dir, &["merge", "--ff-only", branch])?;
+    Ok(())
+}
+
+/// Abort an in-progress merge, returning the worktree to a clean state.
+/// Best-effort: callers usually invoke this after a failed `merge` and ignore
+/// the result if there is nothing to abort.
+pub fn merge_abort(dir: &Path) -> Result<()> {
+    let output = run_git(dir, &["merge", "--abort"])?;
+    if !output.success {
+        bail!(
+            "git merge --abort failed in {}: {}",
+            dir.display(),
+            output.stderr
+        );
+    }
+    Ok(())
+}
+
+/// Returns true if a merge is currently in progress in the given worktree.
+pub fn merge_in_progress(dir: &Path) -> Result<bool> {
+    let output = run_git(dir, &["rev-parse", "--verify", "--quiet", "MERGE_HEAD"])?;
+    Ok(output.success)
+}
+
+/// Count commits reachable from `head` but not from `base` (i.e. `base..head`).
+pub fn count_commits_ahead(dir: &Path, base: &str, head: &str) -> Result<usize> {
+    let range = format!("{}..{}", base, head);
+    let output = run_git_checked(dir, &["rev-list", "--count", &range, "--"])?;
+    let count = output
+        .stdout
+        .trim()
+        .parse::<usize>()
+        .with_context(|| format!("failed to parse rev-list count: {:?}", output.stdout))?;
+    Ok(count)
 }
 
 /// Checkout a branch.
@@ -622,5 +672,139 @@ mod tests {
         // Remove the worktree
         worktree_remove(repo_dir, &wt_path).unwrap();
         assert!(!wt_path.exists());
+    }
+
+    fn write_commit(dir: &Path, file: &str, content: &str, message: &str) {
+        fs::write(dir.join(file), content).unwrap();
+        run_git_checked(dir, &["add", file]).unwrap();
+        run_git_checked(dir, &["commit", "-m", message]).unwrap();
+    }
+
+    #[test]
+    fn test_count_commits_ahead_zero_when_equal() {
+        let tmp = create_test_repo();
+        let dir = tmp.path();
+        let main = current_branch(dir).unwrap();
+        run_git_checked(dir, &["branch", "feature"]).unwrap();
+
+        let ahead = count_commits_ahead(dir, &main, "feature").unwrap();
+        assert_eq!(ahead, 0);
+    }
+
+    #[test]
+    fn test_count_commits_ahead_counts_new_commits() {
+        let tmp = create_test_repo();
+        let dir = tmp.path();
+        let main = current_branch(dir).unwrap();
+        run_git_checked(dir, &["checkout", "-b", "feature"]).unwrap();
+        write_commit(dir, "a.txt", "a", "feat: a");
+        write_commit(dir, "b.txt", "b", "feat: b");
+
+        let ahead = count_commits_ahead(dir, &main, "feature").unwrap();
+        assert_eq!(ahead, 2);
+
+        let behind = count_commits_ahead(dir, "feature", &main).unwrap();
+        assert_eq!(behind, 0);
+    }
+
+    #[test]
+    fn test_count_commits_ahead_detects_diverged_branches() {
+        let tmp = create_test_repo();
+        let dir = tmp.path();
+        let main = current_branch(dir).unwrap();
+        run_git_checked(dir, &["checkout", "-b", "feature"]).unwrap();
+        write_commit(dir, "feat.txt", "feat", "feat");
+        run_git_checked(dir, &["checkout", &main]).unwrap();
+        write_commit(dir, "main.txt", "main", "main change");
+
+        assert_eq!(count_commits_ahead(dir, &main, "feature").unwrap(), 1);
+        assert_eq!(count_commits_ahead(dir, "feature", &main).unwrap(), 1);
+    }
+
+    #[test]
+    fn test_merge_in_progress_reports_state() {
+        let tmp = create_test_repo();
+        let dir = tmp.path();
+
+        assert!(!merge_in_progress(dir).unwrap());
+
+        let main = current_branch(dir).unwrap();
+        run_git_checked(dir, &["checkout", "-b", "feature"]).unwrap();
+        write_commit(dir, "shared.txt", "feature side", "feat");
+        run_git_checked(dir, &["checkout", &main]).unwrap();
+        write_commit(dir, "shared.txt", "main side", "main");
+
+        let conflict = merge(dir, "feature");
+        assert!(conflict.is_err(), "expected conflicting merge to fail");
+        assert!(merge_in_progress(dir).unwrap());
+
+        merge_abort(dir).unwrap();
+        assert!(!merge_in_progress(dir).unwrap());
+    }
+
+    #[test]
+    fn test_merge_ff_only_rejects_diverged_branches() {
+        let tmp = create_test_repo();
+        let dir = tmp.path();
+        let main = current_branch(dir).unwrap();
+        run_git_checked(dir, &["checkout", "-b", "feature"]).unwrap();
+        write_commit(dir, "feat.txt", "feat", "feat");
+        run_git_checked(dir, &["checkout", &main]).unwrap();
+        write_commit(dir, "main.txt", "main", "main");
+
+        let result = merge_ff_only(dir, "feature");
+        assert!(result.is_err());
+        assert!(!merge_in_progress(dir).unwrap());
+    }
+
+    #[test]
+    fn test_push_branch_pushes_target_without_changing_head() {
+        let origin_tmp = TempDir::new().unwrap();
+        let origin = origin_tmp.path();
+        run_git_checked(origin, &["init", "--bare"]).unwrap();
+
+        let work = create_test_repo();
+        let dir = work.path();
+        let main = current_branch(dir).unwrap();
+        run_git_checked(
+            dir,
+            &["remote", "add", "origin", origin.to_str().unwrap()],
+        )
+        .unwrap();
+        run_git_checked(dir, &["push", "-u", "origin", &main]).unwrap();
+
+        run_git_checked(dir, &["checkout", "-b", "release"]).unwrap();
+        write_commit(dir, "rel.txt", "rel", "release commit");
+        run_git_checked(dir, &["push", "-u", "origin", "release"]).unwrap();
+
+        run_git_checked(dir, &["checkout", &main]).unwrap();
+        write_commit(dir, "main-only.txt", "m", "main-only commit");
+        run_git_checked(dir, &["checkout", "release"]).unwrap();
+        write_commit(dir, "rel2.txt", "rel2", "release commit 2");
+        run_git_checked(dir, &["checkout", &main]).unwrap();
+
+        push_branch(dir, "release").unwrap();
+        assert_eq!(current_branch(dir).unwrap(), main);
+
+        let remote_tip = run_git_checked(origin, &["rev-parse", "refs/heads/release"])
+            .unwrap()
+            .stdout;
+        let local_tip = run_git_checked(dir, &["rev-parse", "release"])
+            .unwrap()
+            .stdout;
+        assert_eq!(remote_tip, local_tip);
+    }
+
+    #[test]
+    fn test_merge_ff_only_succeeds_for_fast_forward() {
+        let tmp = create_test_repo();
+        let dir = tmp.path();
+        let main = current_branch(dir).unwrap();
+        run_git_checked(dir, &["checkout", "-b", "feature"]).unwrap();
+        write_commit(dir, "feat.txt", "feat", "feat");
+        run_git_checked(dir, &["checkout", &main]).unwrap();
+
+        merge_ff_only(dir, "feature").unwrap();
+        assert_eq!(count_commits_ahead(dir, &main, "feature").unwrap(), 0);
     }
 }

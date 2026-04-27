@@ -1,13 +1,22 @@
 use anyhow::{Context, Result};
 use console::Style;
 use std::path::Path;
-use std::process::Command;
 
 use crate::config::{self, Project, Workspace, WorkspaceProject};
 use crate::git;
 use crate::i18n::t;
 use crate::ui;
 use crate::workspace;
+
+mod commit_message;
+mod formatters;
+
+pub use commit_message::normalize_commit_message_tool;
+use commit_message::generate_commit_message;
+use formatters::{
+    format_gcreate_success, format_gmerge_skipped, format_gmerge_success,
+    format_gpush_local_behind, format_gpush_skipped, format_gswitch_success, format_push_success,
+};
 
 /// Resolved workspace context: the workspace plus matched (WorkspaceProject, Project) pairs.
 fn get_workspace_context() -> Result<(Workspace, Vec<(WorkspaceProject, Project)>)> {
@@ -338,14 +347,73 @@ fn rollback_created_branches(created: &[CheckoutRollback], new_branch: &str) -> 
 pub fn gstatus() -> Result<()> {
     let (_ws, projects) = get_workspace_context()?;
     let bold = Style::new().bold();
+    let dim = Style::new().dim();
+    let green = Style::new().green();
+    let yellow = Style::new().yellow();
+    let red = Style::new().red();
 
     for (wp, _proj) in &projects {
         println!("{}", bold.apply_to(&wp.name));
         let wt_path = Path::new(&wp.worktree_path);
+
+        match git::current_branch(wt_path) {
+            Ok(branch) => {
+                println!(
+                    "  {}",
+                    dim.apply_to(t("status_branch_line").replacen("{}", &branch, 1))
+                );
+
+                match git::remote_branch_exists(wt_path, &branch) {
+                    Ok(true) => {
+                        let remote_ref = format!("origin/{}", branch);
+                        let ahead =
+                            git::count_commits_ahead(wt_path, &remote_ref, &branch).unwrap_or(0);
+                        let behind =
+                            git::count_commits_ahead(wt_path, &branch, &remote_ref).unwrap_or(0);
+                        let line = match (ahead, behind) {
+                            (0, 0) => green
+                                .apply_to(t("status_tracking_synced").replacen("{}", &branch, 1))
+                                .to_string(),
+                            (a, 0) => yellow
+                                .apply_to(
+                                    t("status_tracking_ahead_only")
+                                        .replacen("{}", &branch, 1)
+                                        .replacen("{}", &a.to_string(), 1),
+                                )
+                                .to_string(),
+                            (0, b) => yellow
+                                .apply_to(
+                                    t("status_tracking_behind_only")
+                                        .replacen("{}", &branch, 1)
+                                        .replacen("{}", &b.to_string(), 1),
+                                )
+                                .to_string(),
+                            (a, b) => red
+                                .apply_to(
+                                    t("status_tracking_diverged")
+                                        .replacen("{}", &branch, 1)
+                                        .replacen("{}", &a.to_string(), 1)
+                                        .replacen("{}", &b.to_string(), 1),
+                                )
+                                .to_string(),
+                        };
+                        println!("  {}", line);
+                    }
+                    Ok(false) => {
+                        println!("  {}", dim.apply_to(t("status_tracking_no_remote")));
+                    }
+                    Err(_) => {}
+                }
+            }
+            Err(_) => {
+                // detached HEAD or other error; we still try status_short below
+            }
+        }
+
         match git::status_short(wt_path) {
             Ok(output) => {
                 if output.is_empty() {
-                    println!("  Working tree clean");
+                    println!("  {}", green.apply_to(t("status_working_tree_clean")));
                 } else {
                     for line in output.lines() {
                         println!("  {}", line);
@@ -438,37 +506,6 @@ pub fn gcommit() -> Result<()> {
     Ok(())
 }
 
-fn format_push_success(project: &str, branch: &str, target: &str) -> String {
-    t("push_success")
-        .replacen("{}", project, 1)
-        .replacen("{}", branch, 1)
-        .replacen("{}", branch, 1)
-        .replacen("{}", target, 1)
-}
-
-fn format_gswitch_success(project: &str, original: &str, branch: &str, target: &str) -> String {
-    t("switch_success")
-        .replacen("{}", project, 1)
-        .replacen("{}", original, 1)
-        .replacen("{}", branch, 1)
-        .replacen("{}", target, 1)
-}
-
-fn format_gmerge_success(project: &str, source: &str, target: &str, target_input: &str) -> String {
-    t("merge_success")
-        .replacen("{}", project, 1)
-        .replacen("{}", source, 1)
-        .replacen("{}", target, 1)
-        .replacen("{}", target_input, 1)
-}
-
-fn format_gcreate_success(project: &str, new_branch: &str, start_point: &str) -> String {
-    t("create_success")
-        .replacen("{}", project, 1)
-        .replacen("{}", new_branch, 1)
-        .replacen("{}", start_point, 1)
-}
-
 pub fn gpush(target: Option<String>) -> Result<()> {
     let (ws, projects) = get_workspace_context()?;
     let target_input = target.unwrap_or_else(|| ws.branch.clone());
@@ -477,28 +514,107 @@ pub fn gpush(target: Option<String>) -> Result<()> {
     println!("gpush target: {}", target_input);
     println!();
 
+    for plan in &plans {
+        let wt_path = Path::new(&plan.wp.worktree_path);
+        if let Err(e) = git::fetch(wt_path) {
+            ui::warn(
+                &t("fetch_failed_warn")
+                    .replacen("{}", &plan.wp.name, 1)
+                    .replacen("{}", &e.to_string(), 1),
+            );
+        }
+    }
+
     let mut succeeded = 0usize;
     let mut failed = 0usize;
+    let mut skipped = 0usize;
 
     for plan in &plans {
         let wt_path = Path::new(&plan.wp.worktree_path);
         let branch = &plan.resolved.branch;
+
+        match git::remote_branch_exists(wt_path, branch) {
+            Ok(true) => {
+                let remote_ref = format!("origin/{}", branch);
+                let ahead = match git::count_commits_ahead(wt_path, &remote_ref, branch) {
+                    Ok(n) => n,
+                    Err(e) => {
+                        ui::error(
+                            &t("inspect_commits_failed")
+                                .replacen("{}", &plan.wp.name, 1)
+                                .replacen("{}", branch, 1)
+                                .replacen("{}", &target_input, 1)
+                                .replacen("{}", &e.to_string(), 1),
+                        );
+                        failed += 1;
+                        continue;
+                    }
+                };
+                let behind = match git::count_commits_ahead(wt_path, branch, &remote_ref) {
+                    Ok(n) => n,
+                    Err(e) => {
+                        ui::error(
+                            &t("inspect_commits_failed")
+                                .replacen("{}", &plan.wp.name, 1)
+                                .replacen("{}", &remote_ref, 1)
+                                .replacen("{}", &target_input, 1)
+                                .replacen("{}", &e.to_string(), 1),
+                        );
+                        failed += 1;
+                        continue;
+                    }
+                };
+
+                if ahead == 0 && behind == 0 {
+                    ui::info(&format_gpush_skipped(&plan.wp.name, branch, &target_input));
+                    skipped += 1;
+                    continue;
+                }
+                if behind > 0 {
+                    ui::error(&format_gpush_local_behind(
+                        &plan.wp.name,
+                        branch,
+                        behind,
+                        &target_input,
+                    ));
+                    failed += 1;
+                    continue;
+                }
+            }
+            Ok(false) => {}
+            Err(e) => {
+                ui::error(
+                    &t("check_remote_failed")
+                        .replacen("{}", &plan.wp.name, 1)
+                        .replacen("{}", branch, 1)
+                        .replacen("{}", &target_input, 1)
+                        .replacen("{}", &e.to_string(), 1),
+                );
+                failed += 1;
+                continue;
+            }
+        }
+
         match git::push_upstream(wt_path, branch) {
             Ok(()) => {
                 ui::success(&format_push_success(&plan.wp.name, branch, &target_input));
                 succeeded += 1;
             }
             Err(e) => {
-                ui::error(&format!(
-                    "{}: failed to push {} -> origin/{} (target: {}): {}",
-                    plan.wp.name, branch, branch, target_input, e
-                ));
+                ui::error(
+                    &t("push_failed")
+                        .replacen("{}", &plan.wp.name, 1)
+                        .replacen("{}", branch, 1)
+                        .replacen("{}", branch, 1)
+                        .replacen("{}", &target_input, 1)
+                        .replacen("{}", &e.to_string(), 1),
+                );
                 failed += 1;
             }
         }
     }
 
-    ui::batch_summary(succeeded, failed);
+    ui::batch_summary_with_skipped(succeeded, failed, skipped);
     Ok(())
 }
 
@@ -525,7 +641,7 @@ pub fn gpull() -> Result<()> {
     Ok(())
 }
 
-pub fn gmerge(target: Option<String>) -> Result<()> {
+pub fn gmerge(target: Option<String>, push_after_merge: bool) -> Result<()> {
     let (ws, projects) = get_workspace_context()?;
     precheck_clean_worktrees(&projects)?;
     prefetch_projects(&projects)?;
@@ -535,11 +651,16 @@ pub fn gmerge(target: Option<String>) -> Result<()> {
     };
     let plans = plan_merge_targets(&projects, &ws.branch, &target_input)?;
 
-    println!("gmerge target: {}", target_input);
+    if push_after_merge {
+        println!("gmerge target: {} (with --push)", target_input);
+    } else {
+        println!("gmerge target: {}", target_input);
+    }
     println!();
 
     let mut succeeded = 0usize;
     let mut failed = 0usize;
+    let mut skipped = 0usize;
 
     for (wp, source, target) in &plans {
         let wt_path = Path::new(&wp.worktree_path);
@@ -552,16 +673,26 @@ pub fn gmerge(target: Option<String>) -> Result<()> {
             }
         };
 
-        let result = (|| -> Result<()> {
+        enum MergeOutcome {
+            Merged,
+            Skipped,
+        }
+
+        let result = (|| -> Result<MergeOutcome> {
             git::checkout(wt_path, &target.branch)?;
             git::pull_ff_only(wt_path, "origin", &target.branch)?;
+            let ahead = git::count_commits_ahead(wt_path, &target.branch, &source.branch)?;
+            if ahead == 0 {
+                git::checkout(wt_path, &original)?;
+                return Ok(MergeOutcome::Skipped);
+            }
             git::merge(wt_path, &source.branch)?;
             git::checkout(wt_path, &original)?;
-            Ok(())
+            Ok(MergeOutcome::Merged)
         })();
 
         match result {
-            Ok(()) => {
+            Ok(MergeOutcome::Merged) => {
                 ui::success(&format_gmerge_success(
                     &wp.name,
                     &source.branch,
@@ -569,24 +700,82 @@ pub fn gmerge(target: Option<String>) -> Result<()> {
                     &target_input,
                 ));
                 succeeded += 1;
+
+                if push_after_merge {
+                    match git::push_branch(wt_path, &target.branch) {
+                        Ok(()) => {
+                            ui::success(
+                                &t("merge_push_success")
+                                    .replacen("{}", &wp.name, 1)
+                                    .replacen("{}", &target.branch, 1)
+                                    .replacen("{}", &target.branch, 1)
+                                    .replacen("{}", &target_input, 1),
+                            );
+                        }
+                        Err(e) => {
+                            ui::error(
+                                &t("merge_push_failed")
+                                    .replacen("{}", &wp.name, 1)
+                                    .replacen("{}", &target.branch, 1)
+                                    .replacen("{}", &target.branch, 1)
+                                    .replacen("{}", &target_input, 1)
+                                    .replacen("{}", &e.to_string(), 1),
+                            );
+                            succeeded -= 1;
+                            failed += 1;
+                        }
+                    }
+                }
+            }
+            Ok(MergeOutcome::Skipped) => {
+                ui::info(&format_gmerge_skipped(
+                    &wp.name,
+                    &source.branch,
+                    &target.branch,
+                    &target_input,
+                ));
+                skipped += 1;
             }
             Err(e) => {
-                ui::error(&format!(
-                    "{}: failed to merge {} -> {} (target: {}): {}",
-                    wp.name, source.branch, target.branch, target_input, e
-                ));
+                ui::error(
+                    &t("merge_failed")
+                        .replacen("{}", &wp.name, 1)
+                        .replacen("{}", &source.branch, 1)
+                        .replacen("{}", &target.branch, 1)
+                        .replacen("{}", &target_input, 1)
+                        .replacen("{}", &e.to_string(), 1),
+                );
+                match git::merge_in_progress(wt_path) {
+                    Ok(true) => {
+                        if let Err(abort_err) = git::merge_abort(wt_path) {
+                            ui::error(
+                                &t("merge_abort_failed")
+                                    .replacen("{}", &wp.name, 1)
+                                    .replacen("{}", &abort_err.to_string(), 1),
+                            );
+                        }
+                    }
+                    Ok(false) => {}
+                    Err(probe_err) => ui::error(
+                        &t("merge_state_probe_failed")
+                            .replacen("{}", &wp.name, 1)
+                            .replacen("{}", &probe_err.to_string(), 1),
+                    ),
+                }
                 if let Err(checkout_err) = git::checkout(wt_path, &original) {
-                    ui::error(&format!(
-                        "{}: checkout back to '{}' failed: {}",
-                        wp.name, original, checkout_err
-                    ));
+                    ui::error(
+                        &t("checkout_back_failed")
+                            .replacen("{}", &wp.name, 1)
+                            .replacen("{}", &original, 1)
+                            .replacen("{}", &checkout_err.to_string(), 1),
+                    );
                 }
                 failed += 1;
             }
         }
     }
 
-    ui::batch_summary(succeeded, failed);
+    ui::batch_summary_with_skipped(succeeded, failed, skipped);
     Ok(())
 }
 
@@ -757,74 +946,6 @@ pub fn gcreate(name: &str) -> Result<()> {
         ws.name, new_branch
     ));
     Ok(())
-}
-
-pub fn normalize_commit_message_tool(tool: &str) -> &'static str {
-    match tool.trim().to_ascii_lowercase().as_str() {
-        "codex" => "codex",
-        "claude" | "claude-code" | "claude_code" => "claude",
-        "copilot" | "copilot-cli" | "copilot_cli" => "copilot",
-        "cursor" | "cursor-cli" | "cursor_cli" | "cursorcli" => "cursor",
-        _ => "manual",
-    }
-}
-
-fn generate_commit_message(tool: &str, projects: &[(WorkspaceProject, Project)]) -> Result<String> {
-    let mut sections = Vec::new();
-    for (wp, _proj) in projects {
-        let wt_path = Path::new(&wp.worktree_path);
-        if git::has_staged_changes(wt_path)? {
-            let summary = git::staged_diff_summary(wt_path)?;
-            if !summary.is_empty() {
-                sections.push(format!("Project: {}\n{}", wp.name, summary));
-            }
-        }
-    }
-
-    if sections.is_empty() {
-        anyhow::bail!("no staged changes found");
-    }
-
-    let prompt = format!(
-        "Generate one concise git commit message for these staged changes. \
-Use Conventional Commits style when possible. Output only the commit message, no explanation.\n\n{}",
-        sections.join("\n\n")
-    );
-
-    run_commit_message_tool(tool, &prompt)
-}
-
-fn run_commit_message_tool(tool: &str, prompt: &str) -> Result<String> {
-    let output = match tool {
-        "codex" => Command::new("codex").args(["exec", prompt]).output(),
-        "claude" => Command::new("claude").args(["-p", prompt]).output(),
-        "copilot" => Command::new("gh")
-            .args(["copilot", "suggest", "-t", "git", prompt])
-            .output(),
-        "cursor" => Command::new("cursor-agent").args(["-p", prompt]).output(),
-        _ => anyhow::bail!("unsupported commit message tool: {}", tool),
-    }?;
-
-    if !output.status.success() {
-        anyhow::bail!(
-            "{} exited with status {}: {}",
-            tool,
-            output.status,
-            String::from_utf8_lossy(&output.stderr).trim()
-        );
-    }
-
-    let message = String::from_utf8_lossy(&output.stdout)
-        .lines()
-        .map(str::trim)
-        .find(|line| !line.is_empty())
-        .unwrap_or("")
-        .to_string();
-    if message.is_empty() {
-        anyhow::bail!("{} returned an empty commit message", tool);
-    }
-
-    Ok(message)
 }
 
 #[cfg(test)]

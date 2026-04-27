@@ -137,11 +137,25 @@ pub fn header(msg: &str) {
 
 /// Print a batch operation summary showing succeeded and failed counts.
 pub fn batch_summary(succeeded: usize, failed: usize) {
+    batch_summary_with_skipped(succeeded, failed, 0);
+}
+
+/// Print a batch operation summary showing succeeded / failed / skipped counts.
+/// The skipped column is suppressed when it is zero so unaffected commands look unchanged.
+pub fn batch_summary_with_skipped(succeeded: usize, failed: usize, skipped: usize) {
     let green = Style::new().green();
     let red = Style::new().red();
-    println!(
-        "{} succeeded, {} failed",
-        green.apply_to(succeeded),
-        red.apply_to(failed)
-    );
+    let yellow = Style::new().yellow();
+    let template = if skipped > 0 {
+        crate::i18n::t("batch_summary_with_skipped")
+    } else {
+        crate::i18n::t("batch_summary")
+    };
+    let mut line = template
+        .replacen("{}", &green.apply_to(succeeded).to_string(), 1)
+        .replacen("{}", &red.apply_to(failed).to_string(), 1);
+    if skipped > 0 {
+        line = line.replacen("{}", &yellow.apply_to(skipped).to_string(), 1);
+    }
+    println!("{}", line);
 }

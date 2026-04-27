@@ -186,7 +186,48 @@ fn en() -> HashMap<&'static str, &'static str> {
     m.insert("switch_success", "{}: switched {} -> {} (target: {})");
     m.insert("create_success", "{}: created {} from {}");
     m.insert("push_success", "{}: pushed {} -> origin/{} (target: {})");
+    m.insert(
+        "push_skipped_no_commits",
+        "{}: skipped, {} has no new commits over origin/{} (target: {})",
+    );
+    m.insert(
+        "push_local_behind",
+        "{}: local {} is behind origin/{} by {} commit(s); run 'grove gpull' or 'grove sync' first (target: {})",
+    );
+    m.insert("batch_summary", "{} succeeded, {} failed");
+    m.insert(
+        "batch_summary_with_skipped",
+        "{} succeeded, {} failed, {} skipped",
+    );
+    m.insert("fetch_failed_warn", "{}: fetch failed, push checks may use stale data: {}");
+    m.insert("merge_failed", "{}: failed to merge {} -> {} (target: {}): {}");
+    m.insert("merge_abort_failed", "{}: merge --abort failed: {}");
+    m.insert("merge_state_probe_failed", "{}: failed to detect merge state: {}");
+    m.insert("checkout_back_failed", "{}: checkout back to '{}' failed: {}");
+    m.insert("push_failed", "{}: failed to push {} -> origin/{} (target: {}): {}");
+    m.insert("inspect_commits_failed", "{}: failed to inspect commits for {} (target: {}): {}");
+    m.insert("check_remote_failed", "{}: failed to check origin/{} (target: {}): {}");
+    m.insert("ai_commit_tool_timeout", "{} timed out after {}s");
+    m.insert("status_working_tree_clean", "Working tree clean");
+    m.insert("status_branch_line", "branch: {}");
+    m.insert("status_tracking_synced", "in sync with origin/{}");
+    m.insert("status_tracking_diverged", "vs origin/{}: {} ahead, {} behind");
+    m.insert("status_tracking_ahead_only", "vs origin/{}: {} ahead");
+    m.insert("status_tracking_behind_only", "vs origin/{}: {} behind");
+    m.insert("status_tracking_no_remote", "no upstream branch on origin");
+    m.insert(
+        "merge_push_success",
+        "{}: pushed {} -> origin/{} (target: {})",
+    );
+    m.insert(
+        "merge_push_failed",
+        "{}: merged but failed to push {} -> origin/{} (target: {}): {}",
+    );
     m.insert("merge_success", "{}: merged {} -> {} (target: {})");
+    m.insert(
+        "merge_skipped_no_commits",
+        "{}: skipped, {} has no new commits over {} (target: {})",
+    );
 
     // workspace edit
     m.insert(
@@ -368,7 +409,48 @@ fn zh() -> HashMap<&'static str, &'static str> {
     m.insert("switch_success", "{}: 已从 {} 切换到 {} (target: {})");
     m.insert("create_success", "{}: 已创建 {}，起点 {}");
     m.insert("push_success", "{}: 已推送 {} -> origin/{} (target: {})");
+    m.insert(
+        "push_skipped_no_commits",
+        "{}: 已跳过，{} 相对 origin/{} 没有新提交 (target: {})",
+    );
+    m.insert(
+        "push_local_behind",
+        "{}: 本地 {} 落后 origin/{} {} 个提交，请先执行 'grove gpull' 或 'grove sync' (target: {})",
+    );
+    m.insert("batch_summary", "成功 {}，失败 {}");
+    m.insert(
+        "batch_summary_with_skipped",
+        "成功 {}，失败 {}，跳过 {}",
+    );
+    m.insert("fetch_failed_warn", "{}: fetch 失败，推送检查使用的可能是旧数据: {}");
+    m.insert("merge_failed", "{}: 合并失败 {} -> {} (target: {}): {}");
+    m.insert("merge_abort_failed", "{}: merge --abort 失败: {}");
+    m.insert("merge_state_probe_failed", "{}: 检测合并状态失败: {}");
+    m.insert("checkout_back_failed", "{}: 切回 '{}' 失败: {}");
+    m.insert("push_failed", "{}: 推送失败 {} -> origin/{} (target: {}): {}");
+    m.insert("inspect_commits_failed", "{}: 无法读取 {} 的提交计数 (target: {}): {}");
+    m.insert("check_remote_failed", "{}: 无法检查 origin/{} (target: {}): {}");
+    m.insert("ai_commit_tool_timeout", "{} 超时 ({} 秒)");
+    m.insert("status_working_tree_clean", "工作区干净");
+    m.insert("status_branch_line", "分支：{}");
+    m.insert("status_tracking_synced", "与 origin/{} 同步");
+    m.insert("status_tracking_diverged", "对比 origin/{}：领先 {}，落后 {}");
+    m.insert("status_tracking_ahead_only", "对比 origin/{}：领先 {}");
+    m.insert("status_tracking_behind_only", "对比 origin/{}：落后 {}");
+    m.insert("status_tracking_no_remote", "origin 上不存在对应分支");
+    m.insert(
+        "merge_push_success",
+        "{}: 已推送 {} -> origin/{} (target: {})",
+    );
+    m.insert(
+        "merge_push_failed",
+        "{}: 已合并但推送失败 {} -> origin/{} (target: {}): {}",
+    );
     m.insert("merge_success", "{}: 已合并 {} -> {} (target: {})");
+    m.insert(
+        "merge_skipped_no_commits",
+        "{}: 已跳过，{} 相对 {} 没有新提交 (target: {})",
+    );
 
     // workspace edit
     m.insert(
