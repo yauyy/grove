@@ -96,6 +96,10 @@ pub fn run() -> Result<()> {
     workspaces_file.workspaces.remove(ws_idx);
     config::save_workspaces(&workspaces_file)?;
 
+    let mut records = config::load_gcreate_records()?;
+    crate::gcreate_records::purge_records_for_workspace(&mut records, &ws_name);
+    config::save_gcreate_records(&records)?;
+
     // 9. Print success
     ui::success(&t("workspace_deleted").replace("{}", &ws_name));
     Ok(())

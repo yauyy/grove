@@ -91,6 +91,38 @@ pub fn save_workspaces(wf: &WorkspacesFile) -> Result<()> {
     Ok(())
 }
 
+/// Loads gcreate batch records from ~/.grove/gcreate-records.toml.
+pub fn load_gcreate_records() -> Result<GcreateRecordsFile> {
+    let path = grove_dir()?.join("gcreate-records.toml");
+    if !path.exists() {
+        return Ok(GcreateRecordsFile::default());
+    }
+    let content =
+        fs::read_to_string(&path).with_context(|| format!("Failed to read {}", path.display()))?;
+    let file: GcreateRecordsFile =
+        toml::from_str(&content).with_context(|| format!("Failed to parse {}", path.display()))?;
+    Ok(file)
+}
+
+/// Saves gcreate batch records to ~/.grove/gcreate-records.toml.
+pub fn save_gcreate_records(file: &GcreateRecordsFile) -> Result<()> {
+    ensure_dirs()?;
+    let path = grove_dir()?.join("gcreate-records.toml");
+    let content = toml::to_string(file).context("Failed to serialize gcreate records")?;
+    fs::write(&path, content).with_context(|| format!("Failed to write {}", path.display()))?;
+    Ok(())
+}
+
+/// Apply configured git-prefix to a branch name input.
+pub fn apply_git_prefix(input: &str, global: &GlobalConfig) -> String {
+    let git_prefix = expand_date_templates(&global.git_prefix);
+    if git_prefix.is_empty() || input.starts_with(&git_prefix) {
+        input.to_string()
+    } else {
+        format!("{}{}", git_prefix, input)
+    }
+}
+
 pub fn default_branch_presets() -> BTreeMap<String, String> {
     BTreeMap::from([
         ("test".to_string(), "Test branch".to_string()),

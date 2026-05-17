@@ -234,15 +234,6 @@ fn precheck_clean_worktrees(projects: &[(WorkspaceProject, Project)]) -> Result<
     }
 }
 
-fn apply_git_prefix(input: &str, global: &config::GlobalConfig) -> String {
-    let git_prefix = config::expand_date_templates(&global.git_prefix);
-    if git_prefix.is_empty() || input.starts_with(&git_prefix) {
-        input.to_string()
-    } else {
-        format!("{}{}", git_prefix, input)
-    }
-}
-
 fn precheck_new_branch_absent(
     projects: &[(WorkspaceProject, Project)],
     branch: &str,
@@ -857,7 +848,7 @@ pub fn gswitch(target: &str) -> Result<()> {
 pub fn gcreate(name: &str) -> Result<()> {
     let (ws, projects) = get_workspace_context()?;
     let global = config::load_global_config()?;
-    let new_branch = apply_git_prefix(name, &global);
+    let new_branch = config::apply_git_prefix(name, &global);
 
     precheck_clean_worktrees(&projects)?;
 
@@ -941,10 +932,30 @@ pub fn gcreate(name: &str) -> Result<()> {
         );
     }
 
+    let mut records = config::load_gcreate_records()?;
+    let workspace_projects: Vec<config::WorkspaceProject> = projects
+        .iter()
+        .map(|(wp, _)| wp.clone())
+        .collect();
+    crate::gcreate_records::append_record(
+        &mut records,
+        &ws.name,
+        &new_branch,
+        name,
+        &workspace_projects,
+    );
+    config::save_gcreate_records(&records).with_context(|| {
+        format!(
+            "Failed to save gcreate record for workspace '{}' branch '{}'",
+            ws.name, new_branch
+        )
+    })?;
+
     ui::success(&format!(
         "Workspace '{}' branch set to '{}'",
         ws.name, new_branch
     ));
+
     Ok(())
 }
 
@@ -1071,8 +1082,11 @@ mod tests {
             ..Default::default()
         };
 
-        assert_eq!(apply_git_prefix("feature/login", &global), "feature/login");
-        assert_eq!(apply_git_prefix("login", &global), "feature/login");
+        assert_eq!(
+            config::apply_git_prefix("feature/login", &global),
+            "feature/login"
+        );
+        assert_eq!(config::apply_git_prefix("login", &global), "feature/login");
     }
 
     #[test]

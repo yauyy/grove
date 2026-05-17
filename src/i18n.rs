@@ -185,6 +185,24 @@ fn en() -> HashMap<&'static str, &'static str> {
     m.insert("precheck_failed", "Precheck failed for {} project(s)");
     m.insert("switch_success", "{}: switched {} -> {} (target: {})");
     m.insert("create_success", "{}: created {} from {}");
+    m.insert("no_gcreate_records", "No gcreate records yet.");
+    m.insert("select_gcreate_record", "Select a gcreate record");
+    m.insert(
+        "gcreate_delete_confirm",
+        "Delete branch '{}' in workspace '{}' across {} projects?",
+    );
+    m.insert(
+        "gcreate_delete_record_only",
+        "No operable worktrees found. Remove record only?",
+    );
+    m.insert("gcreate_record_deleted", "Gcreate record deleted.");
+    m.insert(
+        "gcreate_rename_workspace_missing",
+        "Workspace '{}' no longer exists; cannot rename gcreate record.",
+    );
+    m.insert("gcreate_rename_prompt", "New branch name");
+    m.insert("gcreate_rename_empty", "Branch name cannot be empty.");
+    m.insert("gcreate_record_renamed", "Gcreate record renamed.");
     m.insert("push_success", "{}: pushed {} -> origin/{} (target: {})");
     m.insert(
         "push_skipped_no_commits",
@@ -408,6 +426,24 @@ fn zh() -> HashMap<&'static str, &'static str> {
     m.insert("precheck_failed", "{} 个项目预检查失败");
     m.insert("switch_success", "{}: 已从 {} 切换到 {} (target: {})");
     m.insert("create_success", "{}: 已创建 {}，起点 {}");
+    m.insert("no_gcreate_records", "暂无 gcreate 批量创建记录。");
+    m.insert("select_gcreate_record", "选择一条 gcreate 记录");
+    m.insert(
+        "gcreate_delete_confirm",
+        "删除分支 '{}'（工作区 '{}'，共 {} 个项目）？",
+    );
+    m.insert(
+        "gcreate_delete_record_only",
+        "没有可操作的工作树。仅删除记录？",
+    );
+    m.insert("gcreate_record_deleted", "gcreate 记录已删除。");
+    m.insert(
+        "gcreate_rename_workspace_missing",
+        "工作区 '{}' 已不存在，无法重命名 gcreate 记录。",
+    );
+    m.insert("gcreate_rename_prompt", "新分支名");
+    m.insert("gcreate_rename_empty", "分支名不能为空。");
+    m.insert("gcreate_record_renamed", "gcreate 记录已重命名。");
     m.insert("push_success", "{}: 已推送 {} -> origin/{} (target: {})");
     m.insert(
         "push_skipped_no_commits",

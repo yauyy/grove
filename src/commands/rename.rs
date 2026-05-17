@@ -110,6 +110,16 @@ pub fn run() -> Result<()> {
     // 6. Save
     config::save_workspaces(&workspaces_file)?;
 
+    let mut records = config::load_gcreate_records()?;
+    crate::gcreate_records::rename_records_workspace(
+        &mut records,
+        &old_name,
+        &new_name,
+        &old_ws_dir,
+        &new_ws_dir,
+    );
+    config::save_gcreate_records(&records)?;
+
     ui::success(
         &t("ws_rename_success")
             .replacen("{}", &old_name, 1)

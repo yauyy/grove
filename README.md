@@ -197,7 +197,10 @@ grove config edit workspaces # 编辑 workspaces.toml
 |------|------|------|
 | `grove sync` | `grove sy` | 同步远程主分支（fetch + merge） |
 | `grove gswitch <target>` | `grove gsw <target>` | 所有项目切换到目标分支 |
-| `grove gcreate <name>` | `grove gcr <name>` | 先 fetch，所有项目基于配置的 `main` 对应远程起点 `origin/<main>` 创建并切换到新分支；失败时回滚已创建分支 |
+| `grove gcreate <name>` | `grove gcr <name>` | 先 fetch，所有项目基于配置的 `main` 对应远程起点 `origin/<main>` 创建并切换到新分支；失败时回滚已创建分支；成功后会写入 gcreate 记录 |
+| `grove glist` | `grove gli` | 列出所有 `gcr` 批量创建记录（跨工作区） |
+| `grove glist --rm` | | 交互选择并删除一次 `gcr` 在各项目创建的本地分支 |
+| `grove glist --rename` | | 交互选择并重命名一次 `gcr` 创建的分支 |
 | `grove grename` | `grove grn` | 重命名所有项目的分支 |
 | `grove gstatus` | `grove gs` | 查看所有项目 git status |
 | `grove gadd` | `grove ga` | 所有项目 git add -A |
@@ -526,7 +529,10 @@ Commands are organized in three dimensions: **Project** (top-level), **Workspace
 |---------|-------|-------------|
 | `grove sync` | `sy` | Sync remote main branch (fetch + merge) |
 | `grove gswitch <target>` | `grove gsw <target>` | Switch all projects to the target branch |
-| `grove gcreate <name>` | `grove gcr <name>` | Fetch first, then create and switch all projects from each configured `main` remote start point `origin/<main>`; roll back created branches on failure |
+| `grove gcreate <name>` | `grove gcr <name>` | Fetch first, then create and switch all projects from each configured `main` remote start point `origin/<main>`; roll back created branches on failure; appends a gcreate record on success |
+| `grove glist` | `grove gli` | List all `gcr` batch records across workspaces |
+| `grove glist --rm` | | Interactively delete local branches from a selected `gcr` record |
+| `grove glist --rename` | | Interactively rename branches from a selected `gcr` record |
 | `grove grename` | `grn` | Rename branch across all projects |
 | `grove gstatus` | `gs` | Batch git status |
 | `grove gadd` | `ga` | Batch git add -A |

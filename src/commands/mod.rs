@@ -5,6 +5,7 @@ pub mod config;
 pub mod create;
 pub mod delete;
 pub mod git_ops;
+pub mod glist;
 pub mod gowork;
 pub mod group;
 pub mod language;

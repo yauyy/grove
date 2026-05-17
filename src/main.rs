@@ -1,6 +1,7 @@
 mod branch_target;
 mod commands;
 mod config;
+mod gcreate_records;
 mod git;
 mod i18n;
 mod ui;
@@ -105,6 +106,17 @@ enum Commands {
     Gcreate {
         /// New branch name, git-prefix is applied if configured
         name: String,
+    },
+
+    /// List gcreate batch records across all workspaces
+    #[command(alias = "gli")]
+    Glist {
+        /// Interactively delete branches from a selected gcreate record
+        #[arg(long = "rm", conflicts_with = "rename")]
+        rm: bool,
+        /// Interactively rename branches from a selected gcreate record
+        #[arg(long = "rename", conflicts_with = "rm")]
+        rename: bool,
     },
 
     /// Pull all projects
@@ -214,6 +226,7 @@ fn main() -> anyhow::Result<()> {
         Some(Commands::Gpush { ref target }) => commands::git_ops::gpush(target.clone()),
         Some(Commands::Gswitch { ref target }) => commands::git_ops::gswitch(target),
         Some(Commands::Gcreate { ref name }) => commands::git_ops::gcreate(name),
+        Some(Commands::Glist { rm, rename }) => commands::glist::run(rm, rename),
         Some(Commands::Gpull) => commands::git_ops::gpull(),
         Some(Commands::Gowork) => commands::gowork::run(),
         Some(Commands::Tags) => commands::tags::run(),

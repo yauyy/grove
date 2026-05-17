@@ -136,6 +136,28 @@ pub struct WorkspacesFile {
     pub workspaces: Vec<Workspace>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct GcreateRecordProject {
+    pub name: String,
+    pub worktree_path: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct GcreateRecord {
+    pub id: String,
+    pub workspace: String,
+    pub branch: String,
+    pub input: String,
+    pub created_at: String,
+    pub projects: Vec<GcreateRecordProject>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub struct GcreateRecordsFile {
+    #[serde(default)]
+    pub records: Vec<GcreateRecord>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -364,5 +386,29 @@ master = "main"
             Some(&"test".to_string())
         );
         assert_eq!(parsed.projects[0].branches.get("test"), Some("test-master"));
+    }
+
+    #[test]
+    fn test_gcreate_records_file_roundtrip() {
+        let file = GcreateRecordsFile {
+            records: vec![GcreateRecord {
+                id: "550e8400-e29b-41d4-a716-446655440000".to_string(),
+                workspace: "feature-x".to_string(),
+                branch: "demo1".to_string(),
+                input: "demo1".to_string(),
+                created_at: "2026-05-17T10:30:00+08:00".to_string(),
+                projects: vec![GcreateRecordProject {
+                    name: "api".to_string(),
+                    worktree_path: "/tmp/feature-x/api".to_string(),
+                }],
+            }],
+        };
+
+        let toml_str = toml::to_string(&file).unwrap();
+        let parsed: GcreateRecordsFile = toml::from_str(&toml_str).unwrap();
+
+        assert_eq!(parsed.records.len(), 1);
+        assert_eq!(parsed.records[0].branch, "demo1");
+        assert_eq!(parsed.records[0].projects[0].name, "api");
     }
 }

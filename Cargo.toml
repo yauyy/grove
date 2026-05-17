@@ -1,6 +1,6 @@
 [package]
 name = "grove-cli"
-version = "0.6.0"
+version = "0.7.0"
 edition = "2021"
 description = "Multi-project git worktree workspace manager"
 license = "MIT"
@@ -24,6 +24,7 @@ dirs = "6"
 anyhow = "1"
 chrono = { version = "0.4", features = ["serde"] }
 clap_complete = "4"
+uuid = { version = "1", features = ["v4"] }
 
 [dev-dependencies]
 tempfile = "3"

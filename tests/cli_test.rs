@@ -133,3 +133,19 @@ fn test_gcreate_command_exists() {
         .code(1)
         .stderr(workspace_context_failure());
 }
+
+#[test]
+fn test_glist_command_exists() {
+    let (_home, mut cmd) = grove_cmd();
+
+    cmd.args(["glist"]).assert().success();
+}
+
+#[test]
+fn test_glist_rm_and_rename_conflict() {
+    let (_home, mut cmd) = grove_cmd();
+
+    cmd.args(["glist", "--rm", "--rename"])
+        .assert()
+        .failure();
+}
