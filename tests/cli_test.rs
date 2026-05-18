@@ -125,6 +125,16 @@ fn test_gswitch_command_exists() {
 }
 
 #[test]
+fn test_gswitch_accepts_optional_target() {
+    let (_home, mut cmd) = grove_cmd();
+
+    cmd.arg("gswitch")
+        .assert()
+        .code(1)
+        .stderr(workspace_context_failure());
+}
+
+#[test]
 fn test_gcreate_command_exists() {
     let (_home, mut cmd) = grove_cmd();
 

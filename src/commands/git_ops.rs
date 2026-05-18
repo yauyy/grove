@@ -770,10 +770,25 @@ pub fn gmerge(target: Option<String>, push_after_merge: bool) -> Result<()> {
     Ok(())
 }
 
-pub fn gswitch(target: &str) -> Result<()> {
+pub fn gswitch(target: Option<&str>) -> Result<()> {
     let (ws, projects) = get_workspace_context()?;
-    precheck_clean_worktrees(&projects)?;
-    let plans = plan_existing_branch_targets(&projects, target)?;
+    let target = match target.map(str::trim).filter(|value| !value.is_empty()) {
+        Some(value) => value.to_string(),
+        None => {
+            let record = crate::gcreate_records::select_record_for_workspace(&ws.name)?;
+            record.branch
+        }
+    };
+    gswitch_to_target(&ws, &projects, &target)
+}
+
+fn gswitch_to_target(
+    ws: &config::Workspace,
+    projects: &[(WorkspaceProject, Project)],
+    target: &str,
+) -> Result<()> {
+    precheck_clean_worktrees(projects)?;
+    let plans = plan_existing_branch_targets(projects, target)?;
 
     let mut originals = Vec::new();
     for plan in &plans {

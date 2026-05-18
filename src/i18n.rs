@@ -188,6 +188,14 @@ fn en() -> HashMap<&'static str, &'static str> {
     m.insert("no_gcreate_records", "No gcreate records yet.");
     m.insert("select_gcreate_record", "Select a gcreate record");
     m.insert(
+        "no_gcreate_records_for_workspace",
+        "No gcreate records for the current workspace.",
+    );
+    m.insert(
+        "select_gcreate_record_switch",
+        "Select a gcreate branch to switch to",
+    );
+    m.insert(
         "gcreate_delete_confirm",
         "Delete branch '{}' in workspace '{}' across {} projects?",
     );
@@ -428,6 +436,11 @@ fn zh() -> HashMap<&'static str, &'static str> {
     m.insert("create_success", "{}: 已创建 {}，起点 {}");
     m.insert("no_gcreate_records", "暂无 gcreate 批量创建记录。");
     m.insert("select_gcreate_record", "选择一条 gcreate 记录");
+    m.insert(
+        "no_gcreate_records_for_workspace",
+        "当前工作区暂无 gcreate 批量创建记录。",
+    );
+    m.insert("select_gcreate_record_switch", "选择要切换的 gcreate 分支");
     m.insert(
         "gcreate_delete_confirm",
         "删除分支 '{}'（工作区 '{}'，共 {} 个项目）？",

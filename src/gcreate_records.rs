@@ -1,8 +1,11 @@
 use std::path::Path;
 
-use chrono::{DateTime, FixedOffset};
+use anyhow::{bail, Result};
+use chrono::{DateTime, FixedOffset, Local};
 
-use crate::config::{GcreateRecord, GcreateRecordsFile, WorkspaceProject};
+use crate::config::{self, GcreateRecord, GcreateRecordsFile, WorkspaceProject};
+use crate::i18n::t;
+use crate::ui;
 
 pub fn append_record(
     file: &mut GcreateRecordsFile,
@@ -75,6 +78,57 @@ pub enum RecordStatus {
     Ok,
     Partial,
     MissingWorkspace,
+}
+
+pub fn format_created_display(created_at: &str) -> String {
+    DateTime::parse_from_rfc3339(created_at)
+        .map(|dt| dt.with_timezone(&Local).format("%Y-%m-%d %H:%M").to_string())
+        .unwrap_or_else(|_| created_at.to_string())
+}
+
+pub fn select_record_interactive(records: &mut [GcreateRecord], prompt: &str) -> Result<usize> {
+    if records.is_empty() {
+        bail!("{}", t("no_gcreate_records"));
+    }
+    sort_records_newest_first(records);
+    let labels: Vec<String> = records
+        .iter()
+        .map(|record| {
+            format!(
+                "{}  {}  {}",
+                record.workspace,
+                record.branch,
+                format_created_display(&record.created_at)
+            )
+        })
+        .collect();
+    ui::select(prompt, &labels)
+}
+
+pub fn select_record_for_workspace(workspace: &str) -> Result<GcreateRecord> {
+    let file = config::load_gcreate_records()?;
+    let mut records: Vec<GcreateRecord> = file
+        .records
+        .into_iter()
+        .filter(|record| record.workspace == workspace)
+        .collect();
+    if records.is_empty() {
+        ui::info(&t("no_gcreate_records_for_workspace"));
+        bail!("{}", t("no_gcreate_records_for_workspace"));
+    }
+    sort_records_newest_first(&mut records);
+    let labels: Vec<String> = records
+        .iter()
+        .map(|record| {
+            format!(
+                "{}  {}",
+                record.branch,
+                format_created_display(&record.created_at)
+            )
+        })
+        .collect();
+    let idx = ui::select(&t("select_gcreate_record_switch"), &labels)?;
+    Ok(records[idx].clone())
 }
 
 pub fn compute_record_status(record: &GcreateRecord, workspace_exists: bool) -> RecordStatus {
@@ -160,6 +214,20 @@ mod tests {
 
         assert_eq!(file.records[0].workspace, "new-ws");
         assert_eq!(file.records[0].projects[0].worktree_path, "/work/new-ws/api");
+    }
+
+    #[test]
+    fn test_select_record_for_workspace_filters_records() {
+        let mut file = GcreateRecordsFile::default();
+        file.records.push(sample_record("other", "x"));
+        file.records.push(sample_record("ws", "feature-a"));
+        let matched: Vec<GcreateRecord> = file
+            .records
+            .into_iter()
+            .filter(|record| record.workspace == "ws")
+            .collect();
+        assert_eq!(matched.len(), 1);
+        assert_eq!(matched[0].branch, "feature-a");
     }
 
     #[test]

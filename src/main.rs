@@ -97,8 +97,8 @@ enum Commands {
     /// Switch all projects to a target branch
     #[command(alias = "gsw")]
     Gswitch {
-        /// Target preset, alias, logical branch, or real branch
-        target: String,
+        /// Target preset, alias, logical branch, or real branch; omit to pick from gcreate records
+        target: Option<String>,
     },
 
     /// Create and switch to a new branch in all projects
@@ -224,7 +224,9 @@ fn main() -> anyhow::Result<()> {
         Some(Commands::Gadd) => commands::git_ops::gadd(),
         Some(Commands::Gcommit) => commands::git_ops::gcommit(),
         Some(Commands::Gpush { ref target }) => commands::git_ops::gpush(target.clone()),
-        Some(Commands::Gswitch { ref target }) => commands::git_ops::gswitch(target),
+        Some(Commands::Gswitch { ref target }) => {
+            commands::git_ops::gswitch(target.as_deref())
+        }
         Some(Commands::Gcreate { ref name }) => commands::git_ops::gcreate(name),
         Some(Commands::Glist { rm, rename }) => commands::glist::run(rm, rename),
         Some(Commands::Gpull) => commands::git_ops::gpull(),

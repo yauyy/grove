@@ -1,10 +1,10 @@
 use anyhow::{bail, Result};
-use chrono::{DateTime, Local};
 use std::path::Path;
 
-use crate::config::{self, GcreateRecord, ProjectsFile};
+use crate::config::{self, ProjectsFile};
 use crate::gcreate_records::{
-    compute_record_status, remove_record_by_id, sort_records_newest_first, RecordStatus,
+    compute_record_status, format_created_display, remove_record_by_id,
+    select_record_interactive, sort_records_newest_first, RecordStatus,
 };
 use crate::git;
 use crate::i18n::t;
@@ -52,7 +52,7 @@ fn run_list() -> Result<()> {
             "{:<14} {:<24} {:<20} {}",
             workspace_label,
             record.branch,
-            format_created(&record.created_at),
+            format_created_display(&record.created_at),
             status_label(status)
         );
     }
@@ -67,7 +67,8 @@ fn run_rm() -> Result<()> {
         return Ok(());
     }
 
-    let idx = select_record(&mut records_file.records)?;
+    let idx =
+        select_record_interactive(&mut records_file.records, &t("select_gcreate_record"))?;
     let record = records_file.records[idx].clone();
     let projects_file = config::load_projects()?;
     let workspaces = config::load_workspaces()?;
@@ -187,7 +188,8 @@ fn run_rename() -> Result<()> {
         return Ok(());
     }
 
-    let idx = select_record(&mut records_file.records)?;
+    let idx =
+        select_record_interactive(&mut records_file.records, &t("select_gcreate_record"))?;
     let record = records_file.records[idx].clone();
     let workspaces = config::load_workspaces()?;
 
@@ -304,28 +306,6 @@ fn run_rename() -> Result<()> {
 
     ui::success(&t("gcreate_record_renamed"));
     Ok(())
-}
-
-fn select_record(records: &mut [GcreateRecord]) -> Result<usize> {
-    sort_records_newest_first(records);
-    let labels: Vec<String> = records
-        .iter()
-        .map(|r| {
-            format!(
-                "{}  {}  {}",
-                r.workspace,
-                r.branch,
-                format_created(&r.created_at)
-            )
-        })
-        .collect();
-    ui::select(&t("select_gcreate_record"), &labels)
-}
-
-fn format_created(created_at: &str) -> String {
-    DateTime::parse_from_rfc3339(created_at)
-        .map(|dt| dt.with_timezone(&Local).format("%Y-%m-%d %H:%M").to_string())
-        .unwrap_or_else(|_| created_at.to_string())
 }
 
 fn status_label(status: RecordStatus) -> &'static str {
