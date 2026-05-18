@@ -7,16 +7,16 @@ class Grove < Formula
   on_macos do
     if Hardware::CPU.arm?
       url "https://github.com/yauyy/grove/releases/download/v#{version}/grove-aarch64-apple-darwin.tar.gz"
-      sha256 "5b093d6801eff7da915f619fe8b15ec85e719c88823cae316ea404e530c7ae5c"
+      sha256 "77512bdd2e2486cc490e4647abf3c509e5667f00fbdb618d8e14d811d4bbe04a"
     else
       url "https://github.com/yauyy/grove/releases/download/v#{version}/grove-x86_64-apple-darwin.tar.gz"
-      sha256 "f1e973cf5cb397aa5a91dcb10439907991a74a4fc14f42c9f11b28ffbd128e61"
+      sha256 "b72f89fd2f0346464571676a95dd8320a8e4916950e390e6c30a062254a440f8"
     end
   end
 
   on_linux do
     url "https://github.com/yauyy/grove/releases/download/v#{version}/grove-x86_64-unknown-linux-gnu.tar.gz"
-    sha256 "0c44a6c076986b314c07598dbf4fcffb41d5de5c7a2c0e76d2745b5bc5a406c2"
+    sha256 "b8f4579eae19699960a019f2697786da6d015257ecfecee2c11d636c7724c65d"
   end
 
   def install
