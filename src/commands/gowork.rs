@@ -211,7 +211,6 @@ mod tests {
             group: String::new(),
             order: 0,
             tags: vec!["go".to_string()],
-            agents_md: None,
             branch_aliases: std::collections::BTreeMap::new(),
             branches: config::BranchConfig {
                 main: "main".to_string(),
@@ -231,7 +230,6 @@ mod tests {
             group: String::new(),
             order: 0,
             tags: vec!["go".to_string()],
-            agents_md: None,
             branch_aliases: std::collections::BTreeMap::new(),
             branches: config::BranchConfig {
                 main: "main".to_string(),
@@ -252,7 +250,6 @@ mod tests {
             group: String::new(),
             order: 0,
             tags: Vec::new(),
-            agents_md: None,
             branch_aliases: std::collections::BTreeMap::new(),
             branches: config::BranchConfig {
                 main: "main".to_string(),

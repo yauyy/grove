@@ -14,11 +14,10 @@ pub fn grove_dir() -> Result<PathBuf> {
     Ok(home.join(".grove"))
 }
 
-/// Ensures the grove configuration directories exist (~/.grove/ and ~/.grove/agents/).
+/// Ensures the grove configuration directory exists (~/.grove/).
 pub fn ensure_dirs() -> Result<()> {
     let dir = grove_dir()?;
     fs::create_dir_all(&dir).context("Failed to create ~/.grove/")?;
-    fs::create_dir_all(dir.join("agents")).context("Failed to create ~/.grove/agents/")?;
     Ok(())
 }
 
@@ -286,7 +285,6 @@ mod tests {
                 group: "frontend".to_string(),
                 order: 0,
                 tags: Vec::new(),
-                agents_md: None,
                 branch_aliases: BTreeMap::new(),
                 branches: BranchConfig {
                     main: "main".to_string(),

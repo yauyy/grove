@@ -1,10 +1,11 @@
 use anyhow::{bail, Result};
 use std::path::Path;
 
-use crate::config::{self, ProjectsFile};
+use crate::commands::branch_delete::{self, finalize_record_delete, items_from_record};
+use crate::config;
 use crate::gcreate_records::{
-    compute_record_status, format_created_display, remove_record_by_id,
-    select_record_interactive, sort_records_newest_first, RecordStatus,
+    compute_record_status, format_created_display, select_record_interactive,
+    sort_records_newest_first, status_label,
 };
 use crate::git;
 use crate::i18n::t;
@@ -33,8 +34,8 @@ fn run_list() -> Result<()> {
     sort_records_newest_first(&mut records);
 
     println!(
-        "{:<14} {:<24} {:<20} {}",
-        "WORKSPACE", "BRANCH", "CREATED", "STATUS"
+        "{:<14} {:<24} {:<20} STATUS",
+        "WORKSPACE", "BRANCH", "CREATED"
     );
 
     for record in &records {
@@ -71,7 +72,6 @@ fn run_rm() -> Result<()> {
         select_record_interactive(&mut records_file.records, &t("select_gcreate_record"))?;
     let record = records_file.records[idx].clone();
     let projects_file = config::load_projects()?;
-    let workspaces = config::load_workspaces()?;
 
     let confirm_msg = t("gcreate_delete_confirm")
         .replacen("{}", &record.branch, 1)
@@ -81,101 +81,29 @@ fn run_rm() -> Result<()> {
         return Ok(());
     }
 
-    let mut hard_errors = Vec::new();
-    let mut operable = 0usize;
+    let items = items_from_record(&record);
+    let outcome = branch_delete::delete_branch_across_projects(
+        &items,
+        &record.branch,
+        &projects_file,
+    );
 
-    for project in &record.projects {
-        let path = Path::new(&project.worktree_path);
-        if !path.exists() {
-            ui::info(&format!(
-                "{}: worktree path does not exist (skipped): {}",
-                project.name, project.worktree_path
-            ));
-            continue;
-        }
-
-        operable += 1;
-
-        if let Ok(false) = git::is_clean(path) {
-            hard_errors.push(format!(
-                "{}: working tree has uncommitted changes",
-                project.name
-            ));
-            continue;
-        }
-
-        match git::branch_exists(path, &record.branch) {
-            Ok(false) => {
-                ui::info(&format!(
-                    "{}: branch '{}' does not exist (skipped)",
-                    project.name, record.branch
-                ));
-            }
-            Ok(true) => {
-                if let Ok(current) = git::current_branch(path) {
-                    if current == record.branch {
-                        let main_branch = project_main_branch(&projects_file, &project.name);
-                        if let Err(e) = git::checkout(path, &main_branch) {
-                            hard_errors.push(format!(
-                                "{}: failed to switch to main before delete: {}",
-                                project.name, e
-                            ));
-                            continue;
-                        }
-                    }
-                }
-                if let Err(e) = git::branch_delete(path, &record.branch) {
-                    hard_errors.push(format!("{}: {}", project.name, e));
-                } else {
-                    ui::success(&format!(
-                        "{}: deleted branch '{}'",
-                        project.name, record.branch
-                    ));
-                }
-            }
-            Err(e) => hard_errors.push(format!("{}: {}", project.name, e)),
-        }
-    }
-
-    if !hard_errors.is_empty() {
-        for message in &hard_errors {
+    if !outcome.hard_errors.is_empty() {
+        for message in &outcome.hard_errors {
             ui::error(message);
         }
         bail!("glist --rm failed");
     }
 
-    if operable == 0 {
+    if outcome.operable == 0 {
         let only_record = t("gcreate_delete_record_only");
         if !ui::confirm(&only_record, false)? {
             return Ok(());
         }
     }
 
-    let record_id = record.id.clone();
-    if !remove_record_by_id(&mut records_file, &record_id) {
-        bail!("gcreate record not found");
-    }
+    finalize_record_delete(&record, &projects_file, &mut records_file)?;
     config::save_gcreate_records(&records_file)?;
-
-    if let Some(ws) = workspaces
-        .workspaces
-        .iter()
-        .find(|ws| ws.name == record.workspace)
-    {
-        if ws.branch == record.branch {
-            let mut workspaces_file = config::load_workspaces()?;
-            if let Some(ws_mut) = workspaces_file
-                .workspaces
-                .iter_mut()
-                .find(|w| w.name == record.workspace)
-            {
-                if let Some(first) = record.projects.first() {
-                    ws_mut.branch = project_main_branch(&projects_file, &first.name);
-                    config::save_workspaces(&workspaces_file)?;
-                }
-            }
-        }
-    }
 
     ui::success(&t("gcreate_record_deleted"));
     Ok(())
@@ -306,21 +234,4 @@ fn run_rename() -> Result<()> {
 
     ui::success(&t("gcreate_record_renamed"));
     Ok(())
-}
-
-fn status_label(status: RecordStatus) -> &'static str {
-    match status {
-        RecordStatus::Ok => "ok",
-        RecordStatus::Partial => "partial",
-        RecordStatus::MissingWorkspace => "missing-ws",
-    }
-}
-
-fn project_main_branch(projects_file: &ProjectsFile, project_name: &str) -> String {
-    projects_file
-        .projects
-        .iter()
-        .find(|p| p.name == project_name)
-        .map(|p| p.branches.main.clone())
-        .unwrap_or_else(|| "main".to_string())
 }

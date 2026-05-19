@@ -98,20 +98,7 @@ pub fn run(path: &str) -> Result<()> {
         }
     }
 
-    // 8. Optional agents.md configuration
-    let agents_md = ui::input_optional(&t("agents_md_path"), &t("press_enter_skip"))?;
-
-    if let Some(ref md_path) = agents_md {
-        let md_resolved = PathBuf::from(md_path);
-        if !md_resolved.exists() {
-            ui::warn(&format!("agents.md not found at: {}", md_path));
-            if !ui::confirm(&t("continue_anyway"), false)? {
-                bail!("Aborted");
-            }
-        }
-    }
-
-    // 9. Calculate order and save
+    // 8. Calculate order and save
     let order = pf
         .projects
         .iter()
@@ -127,7 +114,6 @@ pub fn run(path: &str) -> Result<()> {
         group,
         order,
         tags: detect_project_tags(&resolved),
-        agents_md,
         branch_aliases: BTreeMap::new(),
         branches: BranchConfig {
             main: main_branch,

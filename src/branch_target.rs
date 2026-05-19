@@ -88,7 +88,6 @@ mod tests {
             group: String::new(),
             order: 0,
             tags: Vec::new(),
-            agents_md: None,
             branch_aliases: BTreeMap::from([("test-master".to_string(), "test".to_string())]),
             branches: BranchConfig {
                 main: "master".to_string(),

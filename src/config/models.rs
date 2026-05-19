@@ -88,8 +88,6 @@ pub struct Project {
     pub order: u32,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tags: Vec<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub agents_md: Option<String>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub branch_aliases: BTreeMap<String, String>,
     pub branches: BranchConfig,
@@ -196,7 +194,6 @@ mod tests {
                 group: "backend".to_string(),
                 order: 1,
                 tags: vec!["go".to_string()],
-                agents_md: Some("/home/user/api/agents.md".to_string()),
                 branch_aliases: BTreeMap::new(),
                 branches: BranchConfig {
                     main: "main".to_string(),
@@ -363,7 +360,6 @@ master = "main"
                 group: String::new(),
                 order: 0,
                 tags: Vec::new(),
-                agents_md: None,
                 branch_aliases: std::collections::BTreeMap::from([(
                     "test-master".to_string(),
                     "test".to_string(),

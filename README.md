@@ -14,7 +14,6 @@ Grove 让你将多个本地 Git 仓库绑定在一起，统一创建工作分支
 - **分支预设与别名** — 全局配置常用分支选项，每个项目可映射到不同真实分支
 - **批量分支切换/创建** — `gswitch` 统一切换，`gcreate` 先 fetch，并基于各项目配置的 `origin/<main>` 创建，失败时回滚已创建分支
 - **工作区重命名** — 重命名工作区及对应分支，自动修复 worktree 链接
-- **AGENTS.md 合并** — 为每个项目配置 AI 代理描述，创建工作区时自动合并
 - **多语言支持** — 支持中文和英文界面，自动检测系统语言
 - **VS Code 集成** — 一键用 VS Code 打开工作区
 - **跨平台** — 支持 macOS 和 Windows
@@ -65,7 +64,6 @@ grove add /path/to/backend
 - 输入主分支名（默认 master）
 - 配置分支预设映射（测试 / 预发 / 正式，可选）
 - 自动校验分支是否存在于远程
-- 配置 agents.md（可选）
 
 ### 2. 创建工作区
 
@@ -201,6 +199,8 @@ grove config edit workspaces # 编辑 workspaces.toml
 | `grove glist` | `grove gli` | 列出所有 `gcr` 批量创建记录（跨工作区） |
 | `grove glist --rm` | | 交互选择并删除一次 `gcr` 在各项目创建的本地分支 |
 | `grove glist --rename` | | 交互选择并重命名一次 `gcr` 创建的分支 |
+| `grove grm [branch]` | `grm [branch]` | 无参：多选 gcreate 记录批量删本地分支；有参：在当前工作区按精确分支名删除 |
+| `grove gbranch` | `gbr` | 查看当前工作区各项目分支（相同则单行，不同则逐项目展示） |
 | `grove grename` | `grove grn` | 重命名所有项目的分支 |
 | `grove gstatus` | `grove gs` | 查看所有项目 git status |
 | `grove gadd` | `grove ga` | 所有项目 git add -A |
@@ -282,7 +282,6 @@ web
 ├── config.toml          # 全局配置
 ├── projects.toml        # 已注册项目
 ├── workspaces.toml      # 工作区记录
-└── agents/              # 各项目的 agents.md
 ```
 
 ### config.toml
@@ -388,7 +387,6 @@ Grove binds multiple local Git repositories together, creating unified work bran
 - **Branch presets and aliases** — Configure shared branch choices while each project maps them to its own real branch
 - **Batch branch switch/create** — `gswitch` switches all projects; `gcreate` fetches first, creates from each project's configured `origin/<main>`, and rolls back created branches on failure
 - **Workspace renaming** — Rename workspace and optionally its branch, auto-repairs worktree links
-- **AGENTS.md merging** — Per-project AI agent descriptions, auto-merged on workspace creation
 - **i18n support** — Chinese and English UI, auto-detects system locale
 - **VS Code integration** — Open workspace in VS Code with one command
 - **Cross-platform** — macOS and Windows
@@ -432,7 +430,7 @@ grove add /path/to/frontend
 grove add /path/to/backend
 ```
 
-Interactive prompts guide you through: group selection, main branch (default master), branch preset mappings (optional), remote validation, agents.md (optional).
+Interactive prompts guide you through: group selection, main branch (default master), branch preset mappings (optional), remote validation.
 
 ### 2. Create a Workspace
 
@@ -533,6 +531,8 @@ Commands are organized in three dimensions: **Project** (top-level), **Workspace
 | `grove glist` | `grove gli` | List all `gcr` batch records across workspaces |
 | `grove glist --rm` | | Interactively delete local branches from a selected `gcr` record |
 | `grove glist --rename` | | Interactively rename branches from a selected `gcr` record |
+| `grove grm [branch]` | `grm [branch]` | No arg: multi-select gcreate records to delete local branches; with arg: delete exact branch name in current workspace |
+| `grove gbranch` | `gbr` | Show current branch(es) in workspace (single line when all match, per-project when they differ) |
 | `grove grename` | `grn` | Rename branch across all projects |
 | `grove gstatus` | `gs` | Batch git status |
 | `grove gadd` | `ga` | Batch git add -A |
@@ -614,7 +614,6 @@ All configuration is stored in `~/.grove/`:
 ├── config.toml          # Global config
 ├── projects.toml        # Registered projects
 ├── workspaces.toml      # Workspace records
-└── agents/              # Per-project agents.md
 ```
 
 ### config.toml
