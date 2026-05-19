@@ -6,7 +6,6 @@ use crate::config::{self, WorkspaceProject};
 use crate::git;
 use crate::i18n::t;
 use crate::ui;
-use crate::workspace;
 
 pub fn run(name: Option<String>) -> Result<()> {
     // 1. Load config files
@@ -173,30 +172,13 @@ pub fn run(name: Option<String>) -> Result<()> {
 
     // Add new projects
     ws.projects.extend(new_ws_projects);
+    let ws_name = ws.name.clone();
 
     config::save_workspaces(&workspaces_file)?;
 
-    // 13. Regenerate AGENTS.md
-    let ws = &workspaces_file.workspaces[ws_idx];
-    let ws_project_names: Vec<String> = ws.projects.iter().map(|p| p.name.clone()).collect();
-    let agents_projects: Vec<config::Project> = projects_file
-        .projects
-        .iter()
-        .filter(|p| ws_project_names.contains(&p.name))
-        .cloned()
-        .collect();
-
-    let agents_path = ws_dir.join("AGENTS.md");
-    if agents_projects.is_empty() {
-        // Remove AGENTS.md if no projects left
-        let _ = std::fs::remove_file(&agents_path);
-    } else {
-        workspace::merge_agents_md(&agents_projects, &agents_path)?;
-    }
-
-    // 14. Print summary
+    // 13. Print summary
     println!();
-    ui::header(&format!("Workspace '{}' updated", ws.name));
+    ui::header(&format!("Workspace '{}' updated", ws_name));
     if !removals.is_empty() {
         println!("  Removed: {}", removals.join(", "));
     }

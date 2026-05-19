@@ -999,7 +999,6 @@ mod tests {
             group: String::new(),
             order: 0,
             tags: Vec::new(),
-            agents_md: None,
             branch_aliases: BTreeMap::new(),
             branches: config::BranchConfig {
                 main: "main".to_string(),

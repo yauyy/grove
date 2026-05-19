@@ -43,7 +43,6 @@ mod tests {
             group: String::new(),
             order: 0,
             tags: tags.into_iter().map(str::to_string).collect(),
-            agents_md: None,
             branch_aliases: std::collections::BTreeMap::new(),
             branches: config::BranchConfig {
                 main: "main".to_string(),

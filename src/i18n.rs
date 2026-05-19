@@ -48,7 +48,6 @@ fn en() -> HashMap<&'static str, &'static str> {
     m.insert("test_branch", "Test branch (leave empty to skip)");
     m.insert("staging_branch", "Staging branch (leave empty to skip)");
     m.insert("prod_branch", "Prod branch (leave empty to skip)");
-    m.insert("agents_md_path", "Path to agents.md");
     m.insert("press_enter_skip", "press Enter to skip");
     m.insert("field_required", "This field is required.");
     m.insert("skipped", "Skipped");
@@ -64,7 +63,6 @@ fn en() -> HashMap<&'static str, &'static str> {
     m.insert("project_name_exists", "A project named '{}' already exists");
     m.insert("not_git_repo", "Not a git repository: {}");
     m.insert("path_not_exist", "Path does not exist: {}");
-    m.insert("configure_agents", "Configure agents.md for this project?");
 
     // grove list
     m.insert(
@@ -104,7 +102,6 @@ fn en() -> HashMap<&'static str, &'static str> {
     );
     m.insert("branch_name", "Branch name");
     m.insert("creating_worktrees", "Creating worktrees...");
-    m.insert("agents_generated", "AGENTS.md generated.");
     m.insert("workspace_created", "Workspace created at: {}");
     m.insert(
         "no_projects_registered",
@@ -204,6 +201,12 @@ fn en() -> HashMap<&'static str, &'static str> {
         "No operable worktrees found. Remove record only?",
     );
     m.insert("gcreate_record_deleted", "Gcreate record deleted.");
+    m.insert("grm_multi_confirm", "Delete {} selected gcreate record(s)?");
+    m.insert("grm_nothing_selected", "No records selected.");
+    m.insert(
+        "grm_branch_deleted",
+        "Workspace '{}': deleted branch '{}'",
+    );
     m.insert(
         "gcreate_rename_workspace_missing",
         "Workspace '{}' no longer exists; cannot rename gcreate record.",
@@ -315,7 +318,6 @@ fn zh() -> HashMap<&'static str, &'static str> {
     m.insert("test_branch", "测试分支（留空跳过）");
     m.insert("staging_branch", "预发分支（留空跳过）");
     m.insert("prod_branch", "正式分支（留空跳过）");
-    m.insert("agents_md_path", "agents.md 路径");
     m.insert("press_enter_skip", "按回车跳过");
     m.insert("field_required", "此字段为必填项。");
     m.insert("skipped", "已跳过");
@@ -328,7 +330,6 @@ fn zh() -> HashMap<&'static str, &'static str> {
     m.insert("project_name_exists", "项目名 '{}' 已存在");
     m.insert("not_git_repo", "不是 Git 仓库: {}");
     m.insert("path_not_exist", "路径不存在: {}");
-    m.insert("configure_agents", "是否为此项目配置 agents.md？");
 
     // grove list
     m.insert(
@@ -365,7 +366,6 @@ fn zh() -> HashMap<&'static str, &'static str> {
     m.insert("select_projects", "选择项目（空格勾选，回车确认）");
     m.insert("branch_name", "分支名称");
     m.insert("creating_worktrees", "正在创建工作区...");
-    m.insert("agents_generated", "AGENTS.md 已生成。");
     m.insert("workspace_created", "工作区已创建: {}");
     m.insert(
         "no_projects_registered",
@@ -450,6 +450,9 @@ fn zh() -> HashMap<&'static str, &'static str> {
         "没有可操作的工作树。仅删除记录？",
     );
     m.insert("gcreate_record_deleted", "gcreate 记录已删除。");
+    m.insert("grm_multi_confirm", "删除选中的 {} 条 gcreate 记录？");
+    m.insert("grm_nothing_selected", "未选择任何记录。");
+    m.insert("grm_branch_deleted", "已删除工作区 '{}' 的分支 '{}'");
     m.insert(
         "gcreate_rename_workspace_missing",
         "工作区 '{}' 已不存在，无法重命名 gcreate 记录。",

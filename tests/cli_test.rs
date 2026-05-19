@@ -159,3 +159,36 @@ fn test_glist_rm_and_rename_conflict() {
         .assert()
         .failure();
 }
+
+#[test]
+fn test_grm_command_exists() {
+    let (_home, mut cmd) = grove_cmd();
+    cmd.arg("grm").assert().success();
+}
+
+#[test]
+fn test_grm_with_branch_requires_workspace() {
+    let (_home, mut cmd) = grove_cmd();
+    cmd.args(["grm", "feature-x"])
+        .assert()
+        .code(1)
+        .stderr(workspace_context_failure());
+}
+
+#[test]
+fn test_gbranch_command_requires_workspace() {
+    let (_home, mut cmd) = grove_cmd();
+    cmd.arg("gbranch")
+        .assert()
+        .code(1)
+        .stderr(workspace_context_failure());
+}
+
+#[test]
+fn test_gbranch_alias_gbr() {
+    let (_home, mut cmd) = grove_cmd();
+    cmd.arg("gbr")
+        .assert()
+        .code(1)
+        .stderr(workspace_context_failure());
+}

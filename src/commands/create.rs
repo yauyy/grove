@@ -6,7 +6,6 @@ use crate::config::{self, ProjectsFile, Workspace, WorkspaceProject};
 use crate::git;
 use crate::i18n::t;
 use crate::ui;
-use crate::workspace;
 
 /// Build a grouped display list of projects for multi-select prompts.
 /// Returns (display_items, index_mapping) where index_mapping[i] is the
@@ -177,13 +176,7 @@ pub fn run(name: Option<String>) -> Result<()> {
         bail!("No worktrees were created successfully");
     }
 
-    // 10. Merge agents.md files
-    let agents_path = ws_dir.join("AGENTS.md");
-    if workspace::merge_agents_md(&selected_projects, &agents_path)? {
-        ui::info("Merged AGENTS.md");
-    }
-
-    // 11. Save workspace record
+    // 10. Save workspace record
     let created_at = chrono::Local::now().format("%Y-%m-%d").to_string();
     let ws = Workspace {
         name: ws_name.clone(),
@@ -206,7 +199,7 @@ pub fn run(name: Option<String>) -> Result<()> {
         }
     }
 
-    // 12. Print summary
+    // 11. Print summary
     println!();
     ui::header(&t("workspace_created").replace("{}", &ws_name));
     ui::batch_summary(succeeded, failed);

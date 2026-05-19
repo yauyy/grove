@@ -1,5 +1,4 @@
 use anyhow::{Context, Result};
-use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::config::{self, Project, ProjectsFile, Workspace};
@@ -44,37 +43,6 @@ pub fn get_or_select_workspace() -> Result<Workspace> {
         .collect();
     let idx = ui::select(&t("select_workspace"), &names)?;
     Ok(workspaces_file.workspaces[idx].clone())
-}
-
-/// Merge agents.md files from multiple projects into a single output file.
-/// Each project's content is preceded by a `# project-name` header and separated by `---`.
-/// If no projects have agents_md set, no file is created.
-pub fn merge_agents_md(projects: &[Project], output_path: &Path) -> Result<bool> {
-    let mut sections: Vec<String> = Vec::new();
-
-    for project in projects {
-        if let Some(ref agents_path) = project.agents_md {
-            let path = Path::new(agents_path);
-            if path.exists() {
-                let content = fs::read_to_string(path)
-                    .with_context(|| format!("Failed to read {}", path.display()))?;
-                sections.push(format!("# {}\n\n{}", project.name, content));
-            }
-        }
-    }
-
-    if sections.is_empty() {
-        return Ok(false);
-    }
-
-    let merged = sections.join("\n\n---\n\n");
-    if let Some(parent) = output_path.parent() {
-        fs::create_dir_all(parent)?;
-    }
-    fs::write(output_path, merged)
-        .with_context(|| format!("Failed to write {}", output_path.display()))?;
-
-    Ok(true)
 }
 
 /// Compute the intersection of environment branch names across the given projects.
@@ -128,16 +96,14 @@ mod tests {
     use super::*;
     use crate::config::{BranchConfig, Project, ProjectsFile};
     use std::collections::BTreeMap;
-    use tempfile::TempDir;
 
-    fn make_project(name: &str, agents_md: Option<&str>, branches: BranchConfig) -> Project {
+    fn make_project(name: &str, branches: BranchConfig) -> Project {
         Project {
             name: name.to_string(),
             path: format!("/tmp/{}", name),
             group: String::new(),
             order: 0,
             tags: Vec::new(),
-            agents_md: agents_md.map(|s| s.to_string()),
             branch_aliases: BTreeMap::new(),
             branches,
         }
@@ -151,80 +117,12 @@ mod tests {
     }
 
     #[test]
-    fn test_merge_agents_md_single() {
-        let tmp = TempDir::new().unwrap();
-        let agents_path = tmp.path().join("agents1.md");
-        fs::write(&agents_path, "Agent instructions for project A").unwrap();
-
-        let projects = vec![make_project(
-            "project-a",
-            Some(agents_path.to_str().unwrap()),
-            default_branches(),
-        )];
-
-        let output = tmp.path().join("merged.md");
-        let created = merge_agents_md(&projects, &output).unwrap();
-        assert!(created);
-
-        let content = fs::read_to_string(&output).unwrap();
-        assert!(content.contains("# project-a"));
-        assert!(content.contains("Agent instructions for project A"));
-    }
-
-    #[test]
-    fn test_merge_agents_md_multiple() {
-        let tmp = TempDir::new().unwrap();
-
-        let agents1 = tmp.path().join("agents1.md");
-        fs::write(&agents1, "Instructions for A").unwrap();
-
-        let agents2 = tmp.path().join("agents2.md");
-        fs::write(&agents2, "Instructions for B").unwrap();
-
-        let projects = vec![
-            make_project(
-                "project-a",
-                Some(agents1.to_str().unwrap()),
-                default_branches(),
-            ),
-            make_project(
-                "project-b",
-                Some(agents2.to_str().unwrap()),
-                default_branches(),
-            ),
-        ];
-
-        let output = tmp.path().join("merged.md");
-        let created = merge_agents_md(&projects, &output).unwrap();
-        assert!(created);
-
-        let content = fs::read_to_string(&output).unwrap();
-        assert!(content.contains("# project-a"));
-        assert!(content.contains("# project-b"));
-        assert!(content.contains("---"));
-        assert!(content.contains("Instructions for A"));
-        assert!(content.contains("Instructions for B"));
-    }
-
-    #[test]
-    fn test_merge_agents_md_no_agents() {
-        let tmp = TempDir::new().unwrap();
-        let projects = vec![make_project("project-a", None, default_branches())];
-
-        let output = tmp.path().join("merged.md");
-        let created = merge_agents_md(&projects, &output).unwrap();
-        assert!(!created);
-        assert!(!output.exists());
-    }
-
-    #[test]
     fn test_common_environments_all_have_test() {
         let pf = ProjectsFile {
             groups: vec![],
             projects: vec![
                 make_project(
                     "a",
-                    None,
                     BranchConfig {
                         main: "main".to_string(),
                         aliases: BTreeMap::from([("test".to_string(), "test".to_string())]),
@@ -232,7 +130,6 @@ mod tests {
                 ),
                 make_project(
                     "b",
-                    None,
                     BranchConfig {
                         main: "main".to_string(),
                         aliases: BTreeMap::from([("test".to_string(), "develop".to_string())]),
@@ -252,13 +149,12 @@ mod tests {
             projects: vec![
                 make_project(
                     "a",
-                    None,
                     BranchConfig {
                         main: "main".to_string(),
                         aliases: BTreeMap::from([("test".to_string(), "test".to_string())]),
                     },
                 ),
-                make_project("b", None, default_branches()),
+                make_project("b", default_branches()),
             ],
         };
 

@@ -86,6 +86,35 @@ pub fn format_created_display(created_at: &str) -> String {
         .unwrap_or_else(|_| created_at.to_string())
 }
 
+pub fn status_label(status: RecordStatus) -> &'static str {
+    match status {
+        RecordStatus::Ok => "ok",
+        RecordStatus::Partial => "partial",
+        RecordStatus::MissingWorkspace => "missing-ws",
+    }
+}
+
+pub fn format_record_select_label(record: &GcreateRecord, workspace_exists: bool) -> String {
+    format!(
+        "{}  {}  {}  {}",
+        record.workspace,
+        record.branch,
+        format_created_display(&record.created_at),
+        status_label(compute_record_status(record, workspace_exists))
+    )
+}
+
+pub fn remove_records_by_workspace_branch(
+    file: &mut GcreateRecordsFile,
+    workspace: &str,
+    branch: &str,
+) -> usize {
+    let before = file.records.len();
+    file.records
+        .retain(|r| !(r.workspace == workspace && r.branch == branch));
+    before - file.records.len()
+}
+
 pub fn select_record_interactive(records: &mut [GcreateRecord], prompt: &str) -> Result<usize> {
     if records.is_empty() {
         bail!("{}", t("no_gcreate_records"));
@@ -228,6 +257,28 @@ mod tests {
             .collect();
         assert_eq!(matched.len(), 1);
         assert_eq!(matched[0].branch, "feature-a");
+    }
+
+    #[test]
+    fn test_remove_records_by_workspace_branch() {
+        let mut file = GcreateRecordsFile::default();
+        file.records.push(sample_record("ws-a", "feat-a"));
+        file.records.push(sample_record("ws-a", "feat-b"));
+        file.records.push(sample_record("ws-b", "feat-a"));
+        let removed = remove_records_by_workspace_branch(&mut file, "ws-a", "feat-a");
+        assert_eq!(removed, 1);
+        assert_eq!(file.records.len(), 2);
+        assert!(file
+            .records
+            .iter()
+            .all(|r| r.branch != "feat-a" || r.workspace != "ws-a"));
+    }
+
+    #[test]
+    fn test_status_label_values() {
+        assert_eq!(status_label(RecordStatus::Ok), "ok");
+        assert_eq!(status_label(RecordStatus::Partial), "partial");
+        assert_eq!(status_label(RecordStatus::MissingWorkspace), "missing-ws");
     }
 
     #[test]

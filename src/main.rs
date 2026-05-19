@@ -119,6 +119,16 @@ enum Commands {
         rename: bool,
     },
 
+    /// Remove local branches (multi-select gcreate records, or by exact branch name)
+    Grm {
+        /// Exact local branch name to delete in the current workspace
+        branch: Option<String>,
+    },
+
+    /// Show current branch(es) for all projects in the workspace
+    #[command(alias = "gbr")]
+    Gbranch,
+
     /// Pull all projects
     #[command(alias = "gl")]
     Gpull,
@@ -229,6 +239,8 @@ fn main() -> anyhow::Result<()> {
         }
         Some(Commands::Gcreate { ref name }) => commands::git_ops::gcreate(name),
         Some(Commands::Glist { rm, rename }) => commands::glist::run(rm, rename),
+        Some(Commands::Grm { ref branch }) => commands::grm::run(branch.as_deref()),
+        Some(Commands::Gbranch) => commands::gbranch::run(),
         Some(Commands::Gpull) => commands::git_ops::gpull(),
         Some(Commands::Gowork) => commands::gowork::run(),
         Some(Commands::Tags) => commands::tags::run(),
