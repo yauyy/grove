@@ -130,6 +130,41 @@ pub fn default_branch_presets() -> BTreeMap<String, String> {
     ])
 }
 
+/// Compute the preset map after adding/updating `name`. The first custom edit
+/// seeds the built-in defaults so a single set never silently drops them.
+pub fn preset_set_map(
+    presets: &BTreeMap<String, String>,
+    name: &str,
+    description: &str,
+) -> BTreeMap<String, String> {
+    let mut map = if presets.is_empty() {
+        default_branch_presets()
+    } else {
+        presets.clone()
+    };
+    map.insert(name.to_string(), description.to_string());
+    map
+}
+
+/// Compute the preset map after removing `name`. Returns the new map plus a
+/// flag indicating it is now empty (defaults will revive). Errors if `name`
+/// is not present after seeding.
+pub fn preset_rm_map(
+    presets: &BTreeMap<String, String>,
+    name: &str,
+) -> Result<(BTreeMap<String, String>, bool)> {
+    let mut map = if presets.is_empty() {
+        default_branch_presets()
+    } else {
+        presets.clone()
+    };
+    if map.remove(name).is_none() {
+        anyhow::bail!("Preset '{}' not found", name);
+    }
+    let now_empty = map.is_empty();
+    Ok((map, now_empty))
+}
+
 pub fn effective_branch_presets(config: &GlobalConfig) -> BTreeMap<String, String> {
     if config.branch_presets.is_empty() {
         default_branch_presets()
@@ -267,6 +302,53 @@ mod tests {
         let keys: Vec<&str> = entries.iter().map(|(key, _)| key.as_str()).collect();
 
         assert_eq!(keys, vec!["test", "staging", "prod"]);
+    }
+
+    #[test]
+    fn test_preset_set_map_seeds_defaults_on_first_edit() {
+        let empty = BTreeMap::new();
+        let map = preset_set_map(&empty, "gray", "Gray release");
+        // Defaults preserved AND the new preset added.
+        assert_eq!(map.get("test"), Some(&"Test branch".to_string()));
+        assert_eq!(map.get("staging"), Some(&"Staging branch".to_string()));
+        assert_eq!(map.get("prod"), Some(&"Prod branch".to_string()));
+        assert_eq!(map.get("gray"), Some(&"Gray release".to_string()));
+    }
+
+    #[test]
+    fn test_preset_set_map_updates_existing_without_reseeding() {
+        let mut existing = BTreeMap::new();
+        existing.insert("gray".to_string(), "old".to_string());
+        let map = preset_set_map(&existing, "gray", "new");
+        assert_eq!(map.get("gray"), Some(&"new".to_string()));
+        // Should not have seeded defaults since the map was non-empty.
+        assert_eq!(map.get("test"), None);
+        assert_eq!(map.len(), 1);
+    }
+
+    #[test]
+    fn test_preset_rm_map_reports_empty_when_last_removed() {
+        let mut existing = BTreeMap::new();
+        existing.insert("gray".to_string(), "Gray".to_string());
+        let (map, now_empty) = preset_rm_map(&existing, "gray").unwrap();
+        assert!(map.is_empty());
+        assert!(now_empty);
+    }
+
+    #[test]
+    fn test_preset_rm_map_seeds_defaults_then_removes() {
+        let empty = BTreeMap::new();
+        let (map, now_empty) = preset_rm_map(&empty, "test").unwrap();
+        assert_eq!(map.get("test"), None);
+        assert_eq!(map.get("staging"), Some(&"Staging branch".to_string()));
+        assert!(!now_empty);
+    }
+
+    #[test]
+    fn test_preset_rm_map_errors_on_missing() {
+        let empty = BTreeMap::new();
+        let err = preset_rm_map(&empty, "nope").unwrap_err();
+        assert!(err.to_string().contains("not found"));
     }
 
     #[test]

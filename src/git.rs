@@ -165,12 +165,23 @@ pub fn worktree_add_existing(repo_dir: &Path, worktree_path: &Path, branch: &str
     Ok(())
 }
 
-/// Remove a worktree.
+/// Remove a worktree (force). Used when the caller has already confirmed that
+/// discarding uncommitted changes is acceptable.
 pub fn worktree_remove(repo_dir: &Path, worktree_path: &Path) -> Result<()> {
     let wt_str = worktree_path
         .to_str()
         .context("Invalid worktree path encoding")?;
     run_git_checked(repo_dir, &["worktree", "remove", "--force", wt_str])?;
+    Ok(())
+}
+
+/// Remove a worktree without --force. Git refuses if the worktree has
+/// uncommitted changes or is locked, keeping the default path safe.
+pub fn worktree_remove_checked(repo_dir: &Path, worktree_path: &Path) -> Result<()> {
+    let wt_str = worktree_path
+        .to_str()
+        .context("Invalid worktree path encoding")?;
+    run_git_checked(repo_dir, &["worktree", "remove", wt_str])?;
     Ok(())
 }
 
@@ -652,6 +663,31 @@ mod tests {
         branch_rename(dir, "old-branch", "new-branch").unwrap();
         assert!(!branch_exists(dir, "old-branch").unwrap());
         assert!(branch_exists(dir, "new-branch").unwrap());
+    }
+
+    #[test]
+    fn test_worktree_remove_checked_refuses_dirty_but_removes_clean() {
+        let tmp = create_test_repo();
+        let repo_dir = tmp.path();
+        let main_branch = current_branch(repo_dir).unwrap();
+
+        // Clean worktree removes fine.
+        let clean_wt = repo_dir.join("wt-clean");
+        worktree_add(repo_dir, &clean_wt, "wt-clean-branch", &main_branch).unwrap();
+        assert!(clean_wt.exists());
+        worktree_remove_checked(repo_dir, &clean_wt).unwrap();
+        assert!(!clean_wt.exists());
+
+        // Dirty worktree is refused without force.
+        let dirty_wt = repo_dir.join("wt-dirty");
+        worktree_add(repo_dir, &dirty_wt, "wt-dirty-branch", &main_branch).unwrap();
+        fs::write(dirty_wt.join("scratch.txt"), "uncommitted").unwrap();
+        assert!(worktree_remove_checked(repo_dir, &dirty_wt).is_err());
+        assert!(dirty_wt.exists());
+
+        // Force removal still works.
+        worktree_remove(repo_dir, &dirty_wt).unwrap();
+        assert!(!dirty_wt.exists());
     }
 
     #[test]

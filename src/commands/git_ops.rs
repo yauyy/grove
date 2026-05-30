@@ -632,8 +632,157 @@ pub fn gpull() -> Result<()> {
     Ok(())
 }
 
-pub fn gmerge(target: Option<String>, push_after_merge: bool) -> Result<()> {
+/// A target branch that received a merge and is eligible for an opt-in push.
+#[derive(Debug, Clone)]
+struct MergedTarget {
+    name: String,
+    worktree_path: String,
+    target_branch: String,
+    original_branch: String,
+    target_input: String,
+}
+
+/// Index-filter helper kept pure for unit testing the multi-select wiring.
+fn pick_by_indices<T: Clone>(items: &[T], indices: &[usize]) -> Vec<T> {
+    indices
+        .iter()
+        .filter_map(|&i| items.get(i).cloned())
+        .collect()
+}
+
+/// Resolve which projects to merge: all of them with `--all`, otherwise an
+/// interactive multi-select (default: all checked). Selection happens before
+/// any precheck so unselected dirty projects never block the batch.
+fn select_merge_projects(
+    projects: Vec<(WorkspaceProject, Project)>,
+    all: bool,
+) -> Result<Vec<(WorkspaceProject, Project)>> {
+    if all || projects.is_empty() {
+        return Ok(projects);
+    }
+    let labels: Vec<String> = projects.iter().map(|(wp, _)| wp.name.clone()).collect();
+    let defaults: Vec<bool> = vec![true; labels.len()];
+    let indices = ui::multi_select(&t("gmerge_select_projects"), &labels, &defaults)?;
+    Ok(pick_by_indices(&projects, &indices))
+}
+
+/// Warn (non-blocking) when a source branch is behind or diverged from its
+/// remote, so merges do not silently carry stale code.
+fn warn_source_freshness(
+    plans: &[(
+        WorkspaceProject,
+        crate::branch_target::ResolvedBranch,
+        crate::branch_target::ResolvedBranch,
+    )],
+) {
+    for (wp, source, _target) in plans {
+        let wt_path = Path::new(&wp.worktree_path);
+        if !git::remote_branch_exists(wt_path, &source.branch).unwrap_or(false) {
+            continue; // local-only source branch: nothing to compare against
+        }
+        let remote_ref = format!("origin/{}", source.branch);
+        let behind = git::count_commits_ahead(wt_path, &source.branch, &remote_ref).unwrap_or(0);
+        let ahead = git::count_commits_ahead(wt_path, &remote_ref, &source.branch).unwrap_or(0);
+        if behind > 0 && ahead > 0 {
+            ui::warn(
+                &t("merge_source_diverged")
+                    .replacen("{}", &wp.name, 1)
+                    .replacen("{}", &source.branch, 1)
+                    .replacen("{}", &source.branch, 1),
+            );
+        } else if behind > 0 {
+            ui::warn(
+                &t("merge_source_behind")
+                    .replacen("{}", &wp.name, 1)
+                    .replacen("{}", &source.branch, 1)
+                    .replacen("{}", &source.branch, 1)
+                    .replacen("{}", &behind.to_string(), 1),
+            );
+        }
+    }
+}
+
+/// Safely push each merged target branch: checkout target, fast-forward from
+/// origin (never force), push, then always restore the original branch.
+/// Returns (pushed, failed). A non-fast-forwardable target is treated as an
+/// expected, safe failure: the push is skipped and the user is told to resolve
+/// it manually.
+fn push_merged_targets(merged: &[MergedTarget]) -> (usize, usize) {
+    let mut pushed = 0usize;
+    let mut failed = 0usize;
+
+    for m in merged {
+        let wt_path = Path::new(&m.worktree_path);
+        let result = (|| -> Result<()> {
+            git::checkout(wt_path, &m.target_branch)?;
+            // Re-sync the target before pushing; ff-only so a diverged remote
+            // fails here instead of tempting a force push.
+            git::pull_ff_only(wt_path, "origin", &m.target_branch)
+                .map_err(|e| anyhow::anyhow!("pull-before-push: {}", e))?;
+            git::push_branch(wt_path, &m.target_branch)?;
+            Ok(())
+        })();
+
+        // Always attempt to restore the original branch, regardless of outcome.
+        let restore = git::checkout(wt_path, &m.original_branch);
+
+        match result {
+            Ok(()) => {
+                ui::success(
+                    &t("merge_push_success")
+                        .replacen("{}", &m.name, 1)
+                        .replacen("{}", &m.target_branch, 1)
+                        .replacen("{}", &m.target_branch, 1)
+                        .replacen("{}", &m.target_input, 1),
+                );
+                pushed += 1;
+            }
+            Err(e) => {
+                let msg = e.to_string();
+                if msg.starts_with("pull-before-push:") {
+                    ui::error(
+                        &t("merge_push_pull_failed")
+                            .replacen("{}", &m.name, 1)
+                            .replacen("{}", &m.target_branch, 1)
+                            .replacen("{}", &msg, 1),
+                    );
+                } else {
+                    ui::error(
+                        &t("merge_push_failed")
+                            .replacen("{}", &m.name, 1)
+                            .replacen("{}", &m.target_branch, 1)
+                            .replacen("{}", &m.target_branch, 1)
+                            .replacen("{}", &m.target_input, 1)
+                            .replacen("{}", &msg, 1),
+                    );
+                }
+                failed += 1;
+            }
+        }
+
+        if let Err(checkout_err) = restore {
+            ui::error(
+                &t("checkout_back_failed")
+                    .replacen("{}", &m.name, 1)
+                    .replacen("{}", &m.original_branch, 1)
+                    .replacen("{}", &checkout_err.to_string(), 1),
+            );
+        }
+    }
+
+    (pushed, failed)
+}
+
+pub fn gmerge(target: Option<String>, push_after_merge: bool, all: bool) -> Result<()> {
     let (ws, projects) = get_workspace_context()?;
+
+    // Selection first, so unselected (possibly dirty) projects never block.
+    let projects = select_merge_projects(projects, all)?;
+    if projects.is_empty() {
+        ui::info(&t("gmerge_no_projects_selected"));
+        return Ok(());
+    }
+
     precheck_clean_worktrees(&projects)?;
     prefetch_projects(&projects)?;
     let target_input = match target {
@@ -641,6 +790,7 @@ pub fn gmerge(target: Option<String>, push_after_merge: bool) -> Result<()> {
         None => select_branch_preset()?,
     };
     let plans = plan_merge_targets(&projects, &ws.branch, &target_input)?;
+    warn_source_freshness(&plans);
 
     if push_after_merge {
         println!("gmerge target: {} (with --push)", target_input);
@@ -652,6 +802,7 @@ pub fn gmerge(target: Option<String>, push_after_merge: bool) -> Result<()> {
     let mut succeeded = 0usize;
     let mut failed = 0usize;
     let mut skipped = 0usize;
+    let mut merged: Vec<MergedTarget> = Vec::new();
 
     for (wp, source, target) in &plans {
         let wt_path = Path::new(&wp.worktree_path);
@@ -691,32 +842,13 @@ pub fn gmerge(target: Option<String>, push_after_merge: bool) -> Result<()> {
                     &target_input,
                 ));
                 succeeded += 1;
-
-                if push_after_merge {
-                    match git::push_branch(wt_path, &target.branch) {
-                        Ok(()) => {
-                            ui::success(
-                                &t("merge_push_success")
-                                    .replacen("{}", &wp.name, 1)
-                                    .replacen("{}", &target.branch, 1)
-                                    .replacen("{}", &target.branch, 1)
-                                    .replacen("{}", &target_input, 1),
-                            );
-                        }
-                        Err(e) => {
-                            ui::error(
-                                &t("merge_push_failed")
-                                    .replacen("{}", &wp.name, 1)
-                                    .replacen("{}", &target.branch, 1)
-                                    .replacen("{}", &target.branch, 1)
-                                    .replacen("{}", &target_input, 1)
-                                    .replacen("{}", &e.to_string(), 1),
-                            );
-                            succeeded -= 1;
-                            failed += 1;
-                        }
-                    }
-                }
+                merged.push(MergedTarget {
+                    name: wp.name.clone(),
+                    worktree_path: wp.worktree_path.clone(),
+                    target_branch: target.branch.clone(),
+                    original_branch: original.clone(),
+                    target_input: target_input.clone(),
+                });
             }
             Ok(MergeOutcome::Skipped) => {
                 ui::info(&format_gmerge_skipped(
@@ -766,7 +898,39 @@ pub fn gmerge(target: Option<String>, push_after_merge: bool) -> Result<()> {
         }
     }
 
-    ui::batch_summary_with_skipped(succeeded, failed, skipped);
+    // Merge phase summary (kept separate from push so a local merge success is
+    // never reported as a failure when a later push fails).
+    println!(
+        "{}",
+        t("merge_phase_summary")
+            .replacen("{}", &succeeded.to_string(), 1)
+            .replacen("{}", &failed.to_string(), 1)
+            .replacen("{}", &skipped.to_string(), 1)
+    );
+
+    // Push phase: automatic with --push, otherwise prompt when there is
+    // anything to push. No prompt at all when nothing merged.
+    if merged.is_empty() {
+        return Ok(());
+    }
+    let should_push = if push_after_merge {
+        true
+    } else {
+        ui::confirm(
+            &t("gmerge_push_confirm").replace("{}", &merged.len().to_string()),
+            false,
+        )?
+    };
+    if should_push {
+        let (pushed, push_failed) = push_merged_targets(&merged);
+        println!(
+            "{}",
+            t("push_phase_summary")
+                .replacen("{}", &pushed.to_string(), 1)
+                .replacen("{}", &push_failed.to_string(), 1)
+        );
+    }
+
     Ok(())
 }
 
@@ -1196,5 +1360,143 @@ mod tests {
         let err = plan_merge_targets(&[(wp, project)], "feature", "prod").unwrap_err();
 
         assert_eq!(err.to_string(), "Precheck failed for 1 project(s)");
+    }
+
+    #[test]
+    fn test_pick_by_indices_selects_subset_in_order() {
+        let items = vec!["a", "b", "c", "d"];
+        assert_eq!(pick_by_indices(&items, &[0, 2]), vec!["a", "c"]);
+        assert_eq!(pick_by_indices(&items, &[]), Vec::<&str>::new());
+        // Out-of-range indices are ignored, not panicking.
+        assert_eq!(pick_by_indices(&items, &[3, 9]), vec!["d"]);
+    }
+
+    #[test]
+    fn test_select_merge_projects_all_returns_everything_without_ui() {
+        let projects = vec![
+            (
+                WorkspaceProject {
+                    name: "api".to_string(),
+                    worktree_path: "/tmp/api".to_string(),
+                },
+                test_project("api"),
+            ),
+            (
+                WorkspaceProject {
+                    name: "web".to_string(),
+                    worktree_path: "/tmp/web".to_string(),
+                },
+                test_project("web"),
+            ),
+        ];
+
+        let selected = select_merge_projects(projects.clone(), true).unwrap();
+        assert_eq!(selected.len(), 2);
+        assert_eq!(selected[0].0.name, "api");
+        assert_eq!(selected[1].0.name, "web");
+    }
+
+    fn commit_file(dir: &Path, file: &str, content: &str, message: &str) {
+        std::fs::write(dir.join(file), content).unwrap();
+        git::run_git_checked(dir, &["add", file]).unwrap();
+        git::run_git_checked(dir, &["commit", "-m", message]).unwrap();
+    }
+
+    /// Build a work repo wired to a fresh bare origin, with `main` pushed.
+    fn repo_with_origin() -> (TempDir, TempDir, String) {
+        let origin_tmp = TempDir::new().unwrap();
+        git::run_git_checked(origin_tmp.path(), &["init", "--bare"]).unwrap();
+
+        let work = create_test_repo();
+        let main = git::current_branch(work.path()).unwrap();
+        git::run_git_checked(
+            work.path(),
+            &["remote", "add", "origin", origin_tmp.path().to_str().unwrap()],
+        )
+        .unwrap();
+        git::run_git_checked(work.path(), &["push", "-u", "origin", &main]).unwrap();
+        (origin_tmp, work, main)
+    }
+
+    #[test]
+    fn test_push_merged_targets_fast_forward_pushes_and_restores_branch() {
+        let (origin, work, main) = repo_with_origin();
+        let dir = work.path();
+
+        // Create + push the target branch, then add a local commit (ahead of origin).
+        git::run_git_checked(dir, &["checkout", "-b", "release"]).unwrap();
+        git::run_git_checked(dir, &["push", "-u", "origin", "release"]).unwrap();
+        commit_file(dir, "rel.txt", "rel", "release work");
+        git::checkout(dir, &main).unwrap();
+
+        let merged = vec![MergedTarget {
+            name: "api".to_string(),
+            worktree_path: dir.to_string_lossy().to_string(),
+            target_branch: "release".to_string(),
+            original_branch: main.clone(),
+            target_input: "prod".to_string(),
+        }];
+
+        let (pushed, failed) = push_merged_targets(&merged);
+        assert_eq!((pushed, failed), (1, 0));
+        // Restored to the original branch.
+        assert_eq!(git::current_branch(dir).unwrap(), main);
+        // Origin now matches local release.
+        let remote_tip = git::run_git_checked(origin.path(), &["rev-parse", "refs/heads/release"])
+            .unwrap()
+            .stdout;
+        let local_tip = git::run_git_checked(dir, &["rev-parse", "release"])
+            .unwrap()
+            .stdout;
+        assert_eq!(remote_tip, local_tip);
+    }
+
+    #[test]
+    fn test_push_merged_targets_diverged_remote_skips_push_no_force() {
+        let (origin, work, main) = repo_with_origin();
+        let dir = work.path();
+
+        git::run_git_checked(dir, &["checkout", "-b", "release"]).unwrap();
+        git::run_git_checked(dir, &["push", "-u", "origin", "release"]).unwrap();
+
+        // Another client advances origin/release.
+        let other = TempDir::new().unwrap();
+        git::run_git_checked(
+            other.path(),
+            &["clone", origin.path().to_str().unwrap(), "."],
+        )
+        .unwrap();
+        git::run_git_checked(other.path(), &["config", "user.email", "o@o.com"]).unwrap();
+        git::run_git_checked(other.path(), &["config", "user.name", "Other"]).unwrap();
+        git::run_git_checked(other.path(), &["checkout", "release"]).unwrap();
+        commit_file(other.path(), "remote.txt", "remote", "remote commit");
+        git::run_git_checked(other.path(), &["push", "origin", "release"]).unwrap();
+        let remote_tip_before =
+            git::run_git_checked(origin.path(), &["rev-parse", "refs/heads/release"])
+                .unwrap()
+                .stdout;
+
+        // Local release diverges with its own commit.
+        commit_file(dir, "local.txt", "local", "local commit");
+        git::checkout(dir, &main).unwrap();
+
+        let merged = vec![MergedTarget {
+            name: "api".to_string(),
+            worktree_path: dir.to_string_lossy().to_string(),
+            target_branch: "release".to_string(),
+            original_branch: main.clone(),
+            target_input: "prod".to_string(),
+        }];
+
+        let (pushed, failed) = push_merged_targets(&merged);
+        assert_eq!((pushed, failed), (0, 1));
+        // Original branch restored even on failure.
+        assert_eq!(git::current_branch(dir).unwrap(), main);
+        // Origin is untouched: no force push happened.
+        let remote_tip_after =
+            git::run_git_checked(origin.path(), &["rev-parse", "refs/heads/release"])
+                .unwrap()
+                .stdout;
+        assert_eq!(remote_tip_before, remote_tip_after);
     }
 }

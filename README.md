@@ -11,8 +11,10 @@ Grove 让你将多个本地 Git 仓库绑定在一起，统一创建工作分支
 - **多项目绑定** — 注册多个本地 Git 项目，按分组管理
 - **一键创建工作区** — 交互式多选项目，自动为每个项目创建 worktree 分支
 - **批量 Git 操作** — 一条命令同时对所有项目执行 add / commit / push / pull / merge
-- **分支预设与别名** — 全局配置常用分支选项，每个项目可映射到不同真实分支
+- **可选合并 + 安全推送** — `gmerge` 支持多选要合并的项目，合并前先把目标分支拉到最新；合并后可一键推送，推送前先 `--ff-only` 拉取、远端分叉时跳过且**绝不强推**
+- **分支预设与别名** — 全局配置常用环境分支（`config preset` 直接增删改），每个项目可映射到不同真实分支
 - **批量分支切换/创建** — `gswitch` 统一切换，`gcreate` 先 fetch，并基于各项目配置的 `origin/<main>` 创建，失败时回滚已创建分支
+- **单项目 worktree 维护** — `grove worktree` 在已有工作区中增删单个项目的 worktree，并保持 `workspaces.toml` 同步
 - **工作区重命名** — 重命名工作区及对应分支，自动修复 worktree 链接
 - **多语言支持** — 支持中文和英文界面，自动检测系统语言
 - **VS Code 集成** — 一键用 VS Code 打开工作区
@@ -206,9 +208,21 @@ grove config edit workspaces # 编辑 workspaces.toml
 | `grove gadd` | `grove ga` | 所有项目 git add -A |
 | `grove gcommit` | `grove gc` | 统一提交消息 |
 | `grove gpush [target]` | `grove gp [target]` | 推送当前或指定分支；先 `git fetch`，无新提交跳过、本地落后会报错 |
-| `grove gmerge [target] [-p/--push]` | `grove gm [target] [-p]` | 合并工作分支到交互选择或指定目标分支；源分支无新提交时跳过、冲突时自动 `merge --abort`；加 `--push` 合并后推送目标分支到 origin |
+| `grove gmerge [target] [-p/--push] [-a/--all]` | `grove gm [target] [-p] [-a]` | 多选要合并的项目（`--all` 跳过多选）→ 合并工作分支到交互选择或指定目标分支（合并前先把目标分支拉到最新）；源分支无新提交时跳过、源分支落后远端时告警、冲突时自动 `merge --abort`；合并后 `--push` 自动推送、否则交互询问，推送前先 `--ff-only` 拉取、远端分叉则跳过且**禁止强推** |
 | `grove gpull` | `grove gl` | 拉取远程更新（`--ff-only`） |
 | `grove gowork` | `grove gw` | 为当前工作区生成/更新 go.work |
+
+#### 单项目 worktree 维护（`worktree` / `gwt`）
+
+在已有工作区里增删单个项目的 worktree，无需重建整个工作区。
+
+| 命令 | 别名 | 说明 |
+|------|------|------|
+| `grove worktree list` | `grove gwt ls` | 列出当前工作区各项目的 worktree 路径、分支、是否干净 |
+| `grove worktree add [project]` | `grove gwt add` | 为已有工作区补一个尚未加入的项目的 worktree（分支取工作区分支）；记录失败时回滚已建 worktree |
+| `grove worktree rm [project] [-f/--force]` | `grove gwt rm` | 移除单个项目的 worktree；默认拒绝有未提交改动的 worktree（`--force` 才强删）；最后一个项目时提示改用 `grove -w remove` |
+| `grove worktree prune` | | 对各项目仓库执行 `git worktree prune` 清理失效记录 |
+| `grove worktree repair` | | 移动目录后修复 worktree 链接 |
 
 #### 示例输出
 
@@ -223,26 +237,26 @@ gpush target: test
 成功 1，失败 0，跳过 1
 ```
 
-`gmerge`：源分支无新提交时跳过；冲突时自动 `merge --abort` 并切回原分支。
+`gmerge`：先多选要合并的项目（默认全选，`--all` 跳过）；合并前把目标分支拉到最新，源分支无新提交时跳过、冲突时自动 `merge --abort` 并切回原分支。合并阶段结束后，若有成功项会询问是否推送。
 
 ```text
 gmerge target: test
 
 ✓ api: 已合并 feature/login -> test-master (target: test)
 ℹ web: 已跳过，feature/login 相对 develop 没有新提交 (target: test)
-
-成功 1，失败 0，跳过 1
+合并：成功 1，失败 0，跳过 1
+是否将 1 个已合并的目标分支 push 到 origin？ [y/N]
 ```
 
-`gmerge --push`：合并成功后顺带把目标分支推到 origin。
+`gmerge --push`：合并成功后自动推送。推送前先对目标分支 `--ff-only` 拉取，远端分叉时跳过该项目且不强推；合并与推送的汇总分开展示。
 
 ```text
 gmerge target: test (with --push)
 
 ✓ api: 已合并 feature/login -> test-master (target: test)
+合并：成功 1，失败 0，跳过 0
 ✓ api: 已推送 test-master -> origin/test-master (target: test)
-
-成功 1，失败 0
+推送：成功 1，失败 0
 ```
 
 `gstatus`：每个项目额外显示当前分支以及和 `origin/<branch>` 的领先/落后情况。
@@ -268,7 +282,10 @@ web
 | `grove config set git-prefix <prefix>` | 设置 Git 分支前缀（如 `feat-`，支持 `[YYYYMMDD]` / `[YYYY-MM-DD]` / `[YYYY/MM/DD]`） |
 | `grove config set commit-message-tool <tool>` | 设置 gcommit 提交信息来源（manual/codex/claude/copilot/cursor） |
 | `grove config set auto-go-work <true/false>` | 创建工作区后自动生成/同步 go.work |
-| `grove config list` | 查看当前配置 |
+| `grove config preset set <name> <描述>` | 新增/修改环境分支预设（首次自定义会先保留内置 test/staging/prod） |
+| `grove config preset rm <name>` | 删除环境分支预设（删到空则恢复内置默认） |
+| `grove config preset list` | 列出环境分支预设 |
+| `grove config list` | 查看当前配置（含 branch-presets） |
 | `grove config edit [file]` | 编辑配置文件（projects/config/workspaces） |
 | `grove language <en/zh>` | 切换界面语言 |
 | `grove completion <shell>` | 生成 Shell 补全脚本 |
@@ -299,6 +316,8 @@ staging = "预发环境"
 prod = "正式环境"
 master = "主分支"
 ```
+
+> `branch_presets` 可用 `grove config preset set/rm/list` 直接管理，无需手动编辑。未配置时使用内置默认 `test` / `staging` / `prod`。
 
 ### projects.toml
 
@@ -384,8 +403,10 @@ Grove binds multiple local Git repositories together, creating unified work bran
 - **Multi-project binding** — Register multiple local Git projects, organized by groups
 - **One-click workspace creation** — Interactive multi-select, auto-creates worktree branches
 - **Batch Git operations** — Single command for add / commit / push / pull / merge across all projects
-- **Branch presets and aliases** — Configure shared branch choices while each project maps them to its own real branch
+- **Selective merge + safe push** — `gmerge` lets you multi-select which projects to merge, fast-forwards the target before merging, and after merging can push in one step; push always `--ff-only` pulls first, skips diverged remotes, and **never force-pushes**
+- **Branch presets and aliases** — Configure shared environment branches (manage them directly with `config preset`) while each project maps them to its own real branch
 - **Batch branch switch/create** — `gswitch` switches all projects; `gcreate` fetches first, creates from each project's configured `origin/<main>`, and rolls back created branches on failure
+- **Per-project worktree maintenance** — `grove worktree` adds/removes a single project's worktree in an existing workspace, keeping `workspaces.toml` in sync
 - **Workspace renaming** — Rename workspace and optionally its branch, auto-repairs worktree links
 - **i18n support** — Chinese and English UI, auto-detects system locale
 - **VS Code integration** — Open workspace in VS Code with one command
@@ -538,9 +559,21 @@ Commands are organized in three dimensions: **Project** (top-level), **Workspace
 | `grove gadd` | `ga` | Batch git add -A |
 | `grove gcommit` | `gc` | Batch git commit |
 | `grove gpush [target]` | `grove gp [target]` | Push the current or specified branch; runs `git fetch` first, skips when there are no new commits, fails fast when local is behind |
-| `grove gmerge [target] [-p/--push]` | `grove gm [target] [-p]` | Merge the work branch to an interactive or specified target branch; skips when source has no new commits, auto-aborts on conflict; with `--push` also pushes the target branch to origin |
+| `grove gmerge [target] [-p/--push] [-a/--all]` | `grove gm [target] [-p] [-a]` | Multi-select which projects to merge (`--all` skips the prompt) → merge the work branch into an interactive or specified target (fast-forwarding the target first); skips when source has no new commits, warns when source is behind its remote, auto-aborts on conflict; after merging, `--push` pushes automatically, otherwise you are prompted — push first `--ff-only` pulls, skips a diverged remote, and **never force-pushes** |
 | `grove gpull` | `gl` | Batch git pull (`--ff-only`) |
 | `grove gowork` | `gw` | Generate/update go.work for the current workspace |
+
+#### Per-project worktree maintenance (`worktree` / `gwt`)
+
+Add or remove a single project's worktree in an existing workspace without rebuilding the whole workspace.
+
+| Command | Alias | Description |
+|---------|-------|-------------|
+| `grove worktree list` | `grove gwt ls` | List each project's worktree path, branch, and clean state |
+| `grove worktree add [project]` | `grove gwt add` | Add a not-yet-included project's worktree (branch = workspace branch); rolls back the created worktree if recording fails |
+| `grove worktree rm [project] [-f/--force]` | `grove gwt rm` | Remove a single project's worktree; refuses a dirty worktree by default (`--force` to discard); guards the last project and suggests `grove -w remove` |
+| `grove worktree prune` | | Run `git worktree prune` across project repos |
+| `grove worktree repair` | | Repair worktree links after moving directories |
 
 #### Output Examples
 
@@ -555,26 +588,26 @@ gpush target: test
 1 succeeded, 0 failed, 1 skipped
 ```
 
-`gmerge`: skips projects whose source branch has no new commits; on conflict, runs `merge --abort` automatically and checks the original branch back out.
+`gmerge`: first multi-select which projects to merge (all checked by default; `--all` skips it); the target is fast-forwarded before merging, projects whose source has no new commits are skipped, and conflicts auto-`merge --abort` and check the original branch back out. When at least one project merged, you are asked whether to push.
 
 ```text
 gmerge target: test
 
 ✓ api: merged feature/login -> test-master (target: test)
 ℹ web: skipped, feature/login has no new commits over develop (target: test)
-
-1 succeeded, 0 failed, 1 skipped
+merge: 1 merged, 0 failed, 1 skipped
+Push 1 merged target branch(es) to origin? [y/N]
 ```
 
-`gmerge --push`: after a successful merge, also pushes the target branch to origin.
+`gmerge --push`: pushes automatically after merging. Before pushing, the target is `--ff-only` pulled; a diverged remote is skipped without force-pushing. Merge and push summaries are shown separately.
 
 ```text
 gmerge target: test (with --push)
 
 ✓ api: merged feature/login -> test-master (target: test)
+merge: 1 merged, 0 failed, 0 skipped
 ✓ api: pushed test-master -> origin/test-master (target: test)
-
-1 succeeded, 0 failed
+push: 1 pushed, 0 failed
 ```
 
 `gstatus`: each project additionally shows the current branch and ahead/behind status against `origin/<branch>`.
@@ -600,7 +633,10 @@ web
 | `grove config set git-prefix <prefix>` | Set git branch prefix (supports `[YYYYMMDD]`, `[YYYY-MM-DD]`, `[YYYY/MM/DD]`) |
 | `grove config set commit-message-tool <tool>` | Set gcommit message source (manual/codex/claude/copilot/cursor) |
 | `grove config set auto-go-work <true/false>` | Generate/sync go.work after workspace creation |
-| `grove config list` | View current config |
+| `grove config preset set <name> <desc>` | Add/update an environment branch preset (the first custom edit keeps the built-in test/staging/prod) |
+| `grove config preset rm <name>` | Remove an environment branch preset (removing the last restores built-in defaults) |
+| `grove config preset list` | List environment branch presets |
+| `grove config list` | View current config (includes branch-presets) |
 | `grove config edit [file]` | Edit config file in editor |
 | `grove language <en/zh>` | Set display language |
 | `grove completion <shell>` | Generate shell completions |
@@ -631,6 +667,8 @@ staging = "Staging environment"
 prod = "Production environment"
 master = "Main branch"
 ```
+
+> `branch_presets` can be managed directly with `grove config preset set/rm/list` — no manual editing needed. When unset, the built-in defaults `test` / `staging` / `prod` are used.
 
 ### projects.toml
 

@@ -21,3 +21,4 @@ pub mod status;
 pub mod sync;
 pub mod tags;
 pub mod workspace_edit;
+pub mod worktree;

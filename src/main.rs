@@ -61,7 +61,7 @@ enum Commands {
     #[command(alias = "sy")]
     Sync,
 
-    /// Merge current branch into environment for all projects
+    /// Merge current branch into environment for selected projects
     #[command(alias = "gm")]
     Gmerge {
         /// Target preset, alias, logical branch, or real branch
@@ -69,6 +69,9 @@ enum Commands {
         /// After a successful merge, also push the target branch to origin
         #[arg(short = 'p', long = "push")]
         push: bool,
+        /// Merge all workspace projects without the interactive multi-select
+        #[arg(short = 'a', long = "all")]
+        all: bool,
     },
 
     /// Rename branch for all projects in a workspace
@@ -137,6 +140,13 @@ enum Commands {
     #[command(alias = "gw")]
     Gowork,
 
+    /// Manage individual project worktrees in the current workspace
+    #[command(alias = "gwt")]
+    Worktree {
+        #[command(subcommand)]
+        action: WorktreeCommands,
+    },
+
     /// Auto-detect and update project tags
     Tags,
 
@@ -190,6 +200,55 @@ enum ConfigCommands {
         /// File to edit: projects, config, workspaces (default: projects)
         file: Option<String>,
     },
+    /// Manage environment branch presets
+    Preset {
+        #[command(subcommand)]
+        action: PresetCommands,
+    },
+}
+
+#[derive(Subcommand)]
+enum PresetCommands {
+    /// Add or update an environment preset
+    Set {
+        /// Preset name (e.g. test, staging, prod, gray)
+        name: String,
+        /// Human-readable description shown in the merge menu
+        description: String,
+    },
+    /// Remove an environment preset
+    #[command(alias = "remove")]
+    Rm {
+        /// Preset name to remove
+        name: String,
+    },
+    /// List configured environment presets
+    List,
+}
+
+#[derive(Subcommand)]
+enum WorktreeCommands {
+    /// List worktrees for each project in the current workspace
+    #[command(alias = "ls")]
+    List,
+    /// Add a project's worktree to the current workspace
+    Add {
+        /// Project name (interactive if omitted)
+        project: Option<String>,
+    },
+    /// Remove a project's worktree from the current workspace
+    #[command(alias = "remove")]
+    Rm {
+        /// Project name (interactive if omitted)
+        project: Option<String>,
+        /// Discard uncommitted changes when removing
+        #[arg(short = 'f', long = "force")]
+        force: bool,
+    },
+    /// Prune stale worktree administrative entries
+    Prune,
+    /// Repair worktree links after moving directories
+    Repair,
 }
 
 fn main() -> anyhow::Result<()> {
@@ -226,9 +285,11 @@ fn main() -> anyhow::Result<()> {
         },
         Some(Commands::Move { ref project }) => commands::mov::run(project.clone()),
         Some(Commands::Sync) => commands::sync::run(),
-        Some(Commands::Gmerge { ref target, push }) => {
-            commands::git_ops::gmerge(target.clone(), push)
-        }
+        Some(Commands::Gmerge {
+            ref target,
+            push,
+            all,
+        }) => commands::git_ops::gmerge(target.clone(), push, all),
         Some(Commands::Grename) => commands::rename::grename(),
         Some(Commands::Gstatus) => commands::git_ops::gstatus(),
         Some(Commands::Gadd) => commands::git_ops::gadd(),
@@ -243,11 +304,28 @@ fn main() -> anyhow::Result<()> {
         Some(Commands::Gbranch) => commands::gbranch::run(),
         Some(Commands::Gpull) => commands::git_ops::gpull(),
         Some(Commands::Gowork) => commands::gowork::run(),
+        Some(Commands::Worktree { action }) => match action {
+            WorktreeCommands::List => commands::worktree::list(),
+            WorktreeCommands::Add { ref project } => commands::worktree::add(project.clone()),
+            WorktreeCommands::Rm { ref project, force } => {
+                commands::worktree::remove(project.clone(), force)
+            }
+            WorktreeCommands::Prune => commands::worktree::prune(),
+            WorktreeCommands::Repair => commands::worktree::repair(),
+        },
         Some(Commands::Tags) => commands::tags::run(),
         Some(Commands::Config { action }) => match action {
             ConfigCommands::Set { ref key, ref value } => commands::config::set(key, value),
             ConfigCommands::List => commands::config::list(),
             ConfigCommands::Edit { ref file } => commands::config::edit(file.as_deref()),
+            ConfigCommands::Preset { action } => match action {
+                PresetCommands::Set {
+                    ref name,
+                    ref description,
+                } => commands::config::preset_set(name, description),
+                PresetCommands::Rm { ref name } => commands::config::preset_rm(name),
+                PresetCommands::List => commands::config::preset_list(),
+            },
         },
         Some(Commands::Completion { ref shell }) => commands::completion::run(shell),
         Some(Commands::Language { ref lang }) => commands::language::run(lang),

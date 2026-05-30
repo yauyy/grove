@@ -257,6 +257,29 @@ fn en() -> HashMap<&'static str, &'static str> {
         "merge_skipped_no_commits",
         "{}: skipped, {} has no new commits over {} (target: {})",
     );
+    m.insert(
+        "gmerge_select_projects",
+        "Select projects to merge (space to toggle, enter to confirm)",
+    );
+    m.insert("gmerge_no_projects_selected", "No projects selected.");
+    m.insert(
+        "gmerge_push_confirm",
+        "Push {} merged target branch(es) to origin?",
+    );
+    m.insert(
+        "merge_source_behind",
+        "{}: source {} is behind origin/{} by {} commit(s); merge may carry stale code",
+    );
+    m.insert(
+        "merge_source_diverged",
+        "{}: source {} has diverged from origin/{}; consider pulling/rebasing first",
+    );
+    m.insert(
+        "merge_push_pull_failed",
+        "{}: push skipped, cannot fast-forward {} from origin (resolve manually; no force push): {}",
+    );
+    m.insert("merge_phase_summary", "merge: {} merged, {} failed, {} skipped");
+    m.insert("push_phase_summary", "push: {} pushed, {} failed");
 
     // workspace edit
     m.insert(
@@ -283,6 +306,43 @@ fn en() -> HashMap<&'static str, &'static str> {
     m.insert("config_edit_opening", "Opening {} with {}");
     m.insert("config_edited", "{} edited successfully");
     m.insert("workpath_forward_only", "Note: changing workpath is forward-only. Existing workspaces remain at their original location.");
+
+    // grove worktree
+    m.insert("wt_no_projects_in_workspace", "Workspace '{}' has no projects.");
+    m.insert("wt_clean", "clean");
+    m.insert("wt_dirty", "{} change(s)");
+    m.insert("wt_detached", "(detached)");
+    m.insert("wt_no_addable", "All registered projects are already in workspace '{}'.");
+    m.insert("wt_select_add", "Select a project to add");
+    m.insert("wt_select_remove", "Select a project to remove");
+    m.insert("wt_already_in_ws", "Project '{}' is already in workspace '{}'.");
+    m.insert("wt_not_in_ws", "Project '{}' is not in workspace '{}'.");
+    m.insert("wt_project_unknown", "Project '{}' is not registered.");
+    m.insert("wt_added", "Added worktree for '{}' at {} (branch {})");
+    m.insert(
+        "wt_add_rollback",
+        "{}: failed to record worktree; rolled back created worktree",
+    );
+    m.insert(
+        "wt_add_rollback_failed",
+        "{}: failed to record worktree AND rollback failed; run 'grove worktree prune' and check {}",
+    );
+    m.insert(
+        "wt_dirty_block",
+        "Project '{}' has uncommitted changes. Commit/stash, or pass --force to discard.",
+    );
+    m.insert("wt_remove_confirm", "Remove worktree for '{}' ({})?");
+    m.insert("wt_removed", "{}: worktree removed");
+    m.insert(
+        "wt_remove_meta_failed",
+        "{}: worktree removed from git but updating workspaces.toml failed: {}",
+    );
+    m.insert(
+        "wt_last_project",
+        "'{}' is the last project; use 'grove -w remove' to delete the whole workspace.",
+    );
+    m.insert("wt_pruned", "{}: pruned stale worktrees");
+    m.insert("wt_repaired", "{}: repaired worktree links");
 
     // grove code
     m.insert("select_workspace_code", "Select workspace to open");
@@ -503,6 +563,23 @@ fn zh() -> HashMap<&'static str, &'static str> {
         "merge_skipped_no_commits",
         "{}: 已跳过，{} 相对 {} 没有新提交 (target: {})",
     );
+    m.insert("gmerge_select_projects", "选择要合并的项目（空格勾选，回车确认）");
+    m.insert("gmerge_no_projects_selected", "未选择任何项目。");
+    m.insert("gmerge_push_confirm", "将 {} 个已合并的目标分支 push 到 origin？");
+    m.insert(
+        "merge_source_behind",
+        "{}: 源分支 {} 落后 origin/{} {} 个提交，合并可能引入陈旧代码",
+    );
+    m.insert(
+        "merge_source_diverged",
+        "{}: 源分支 {} 与 origin/{} 已分叉，建议先 pull/rebase",
+    );
+    m.insert(
+        "merge_push_pull_failed",
+        "{}: 已跳过 push，无法从 origin 快进 {}（请手动处理；禁止强推）: {}",
+    );
+    m.insert("merge_phase_summary", "合并：成功 {}，失败 {}，跳过 {}");
+    m.insert("push_phase_summary", "推送：成功 {}，失败 {}");
 
     // workspace edit
     m.insert(
@@ -529,6 +606,40 @@ fn zh() -> HashMap<&'static str, &'static str> {
         "workpath_forward_only",
         "注意：更改工作区路径仅对后续新建的工作区生效。",
     );
+
+    // grove worktree
+    m.insert("wt_no_projects_in_workspace", "工作区 '{}' 没有任何项目。");
+    m.insert("wt_clean", "干净");
+    m.insert("wt_dirty", "{} 处更改");
+    m.insert("wt_detached", "（游离 HEAD）");
+    m.insert("wt_no_addable", "所有已注册项目都已在工作区 '{}' 中。");
+    m.insert("wt_select_add", "选择要添加的项目");
+    m.insert("wt_select_remove", "选择要移除的项目");
+    m.insert("wt_already_in_ws", "项目 '{}' 已在工作区 '{}' 中。");
+    m.insert("wt_not_in_ws", "项目 '{}' 不在工作区 '{}' 中。");
+    m.insert("wt_project_unknown", "项目 '{}' 未注册。");
+    m.insert("wt_added", "已为 '{}' 添加工作树，路径 {}（分支 {}）");
+    m.insert("wt_add_rollback", "{}: 记录工作树失败，已回滚刚创建的工作树");
+    m.insert(
+        "wt_add_rollback_failed",
+        "{}: 记录工作树失败且回滚失败；请运行 'grove worktree prune' 并检查 {}",
+    );
+    m.insert(
+        "wt_dirty_block",
+        "项目 '{}' 存在未提交的更改。请先提交/暂存，或加 --force 丢弃。",
+    );
+    m.insert("wt_remove_confirm", "确认移除 '{}' 的工作树（{}）？");
+    m.insert("wt_removed", "{}: 工作树已移除");
+    m.insert(
+        "wt_remove_meta_failed",
+        "{}: 工作树已从 git 移除，但更新 workspaces.toml 失败: {}",
+    );
+    m.insert(
+        "wt_last_project",
+        "'{}' 是最后一个项目；请用 'grove -w remove' 删除整个工作区。",
+    );
+    m.insert("wt_pruned", "{}: 已清理失效工作树");
+    m.insert("wt_repaired", "{}: 已修复工作树链接");
 
     // grove code
     m.insert("select_workspace_code", "选择要打开的工作区");

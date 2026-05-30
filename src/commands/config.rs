@@ -60,6 +60,61 @@ pub fn list() -> Result<()> {
     }
     println!("commit-message-tool = {}", config.commit_message_tool);
     println!("auto-go-work = {}", config.auto_go_work);
+
+    let entries = cfg::effective_branch_preset_entries(&config);
+    let custom = !config.branch_presets.is_empty();
+    println!(
+        "branch-presets ({}):",
+        if custom { "custom" } else { "defaults" }
+    );
+    for (name, description) in entries {
+        println!("  {:<10} {}", name, description);
+    }
+    Ok(())
+}
+
+/// Add or update an environment preset.
+///
+/// The first custom edit seeds the built-in defaults (test/staging/prod) so a
+/// single `preset set` never silently drops the default menu.
+pub fn preset_set(name: &str, description: &str) -> Result<()> {
+    let name = name.trim();
+    if name.is_empty() {
+        bail!("Preset name cannot be empty");
+    }
+    let mut config = cfg::load_global_config()?;
+    config.branch_presets = cfg::preset_set_map(&config.branch_presets, name, description);
+    cfg::save_global_config(&config)?;
+    ui::success(&format!("branch-preset '{}' = {}", name, description));
+    Ok(())
+}
+
+/// Remove an environment preset. Removing the final preset re-enables the
+/// built-in defaults, so warn the user when that happens.
+pub fn preset_rm(name: &str) -> Result<()> {
+    let name = name.trim();
+    let mut config = cfg::load_global_config()?;
+    let (map, now_empty) = cfg::preset_rm_map(&config.branch_presets, name)?;
+    config.branch_presets = map;
+    cfg::save_global_config(&config)?;
+    ui::success(&format!("branch-preset '{}' removed", name));
+    if now_empty {
+        ui::warn("All presets removed; built-in defaults (test/staging/prod) are now in effect again.");
+    }
+    Ok(())
+}
+
+pub fn preset_list() -> Result<()> {
+    let config = cfg::load_global_config()?;
+    let entries = cfg::effective_branch_preset_entries(&config);
+    let custom = !config.branch_presets.is_empty();
+    println!(
+        "branch-presets ({}):",
+        if custom { "custom" } else { "defaults" }
+    );
+    for (name, description) in entries {
+        println!("  {:<10} {}", name, description);
+    }
     Ok(())
 }
 

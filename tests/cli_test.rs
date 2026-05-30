@@ -192,3 +192,99 @@ fn test_gbranch_alias_gbr() {
         .code(1)
         .stderr(workspace_context_failure());
 }
+
+#[test]
+fn test_gmerge_all_flag_parses() {
+    let (_home, mut cmd) = grove_cmd();
+    cmd.args(["gmerge", "--all", "test"])
+        .assert()
+        .code(1)
+        .stderr(workspace_context_failure());
+}
+
+#[test]
+fn test_gmerge_push_flag_parses() {
+    let (_home, mut cmd) = grove_cmd();
+    cmd.args(["gmerge", "--push", "test"])
+        .assert()
+        .code(1)
+        .stderr(workspace_context_failure());
+}
+
+#[test]
+fn test_gmerge_all_push_flags_parse() {
+    let (_home, mut cmd) = grove_cmd();
+    cmd.args(["gmerge", "--all", "--push", "test"])
+        .assert()
+        .code(1)
+        .stderr(workspace_context_failure());
+}
+
+#[test]
+fn test_config_preset_list_shows_defaults() {
+    let (_home, mut cmd) = grove_cmd();
+    cmd.args(["config", "preset", "list"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("test"))
+        .stdout(predicate::str::contains("staging"))
+        .stdout(predicate::str::contains("prod"));
+}
+
+#[test]
+fn test_config_preset_set_then_list() {
+    let home = tempfile::tempdir().unwrap();
+
+    Command::cargo_bin("grove")
+        .unwrap()
+        .env("HOME", home.path())
+        .args(["config", "preset", "set", "gray", "Gray release"])
+        .assert()
+        .success();
+
+    // A fresh process with the same HOME must see the persisted preset, and the
+    // built-in defaults must still be present (seed-on-first-edit).
+    Command::cargo_bin("grove")
+        .unwrap()
+        .env("HOME", home.path())
+        .args(["config", "preset", "list"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("gray"))
+        .stdout(predicate::str::contains("test"));
+}
+
+#[test]
+fn test_config_preset_rm_missing_fails() {
+    let (_home, mut cmd) = grove_cmd();
+    cmd.args(["config", "preset", "rm", "does-not-exist"])
+        .assert()
+        .failure();
+}
+
+#[test]
+fn test_worktree_list_requires_workspace() {
+    let (_home, mut cmd) = grove_cmd();
+    cmd.args(["worktree", "list"])
+        .assert()
+        .code(1)
+        .stderr(workspace_context_failure());
+}
+
+#[test]
+fn test_worktree_alias_gwt() {
+    let (_home, mut cmd) = grove_cmd();
+    cmd.args(["gwt", "ls"])
+        .assert()
+        .code(1)
+        .stderr(workspace_context_failure());
+}
+
+#[test]
+fn test_worktree_prune_requires_workspace() {
+    let (_home, mut cmd) = grove_cmd();
+    cmd.args(["worktree", "prune"])
+        .assert()
+        .code(1)
+        .stderr(workspace_context_failure());
+}
