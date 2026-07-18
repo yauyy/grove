@@ -75,6 +75,11 @@ pub fn run() -> Result<()> {
                         let _ = git::worktree_prune(repo_dir);
                     }
                 }
+            } else {
+                // Directory was already removed outside grove: prune the stale
+                // worktree registration so the branch is no longer stuck as
+                // "checked out" at a dead path.
+                let _ = git::worktree_prune(repo_dir);
             }
 
             // Delete branch only if user confirmed

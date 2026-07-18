@@ -119,6 +119,11 @@ pub fn run(name: Option<String>) -> Result<()> {
                         ui::success(&format!("Cleaned up worktree for '{}'", removal));
                     }
                 }
+            } else {
+                // Directory was already removed outside grove: prune the stale
+                // worktree registration so the branch is not left "checked out"
+                // at a dead path.
+                let _ = git::worktree_prune(repo_dir);
             }
             if delete_branch {
                 let _ = git::branch_delete(repo_dir, &branch);
