@@ -1,22 +1,22 @@
 class Grove < Formula
   desc "Multi-project git worktree workspace manager"
   homepage "https://github.com/yauyy/grove"
-  version "0.8.0"
+  version "0.8.1"
   license "MIT"
 
   on_macos do
     if Hardware::CPU.arm?
       url "https://github.com/yauyy/grove/releases/download/v#{version}/grove-aarch64-apple-darwin.tar.gz"
-      sha256 "dabb7b9a7378db1eaf95ede559780bcaa189ea76fa4630918a3be7bfa6d419e7"
+      sha256 "183033ea79207f29752ae95d766f4877917591da130a106be273350c1a39f43c"
     else
       url "https://github.com/yauyy/grove/releases/download/v#{version}/grove-x86_64-apple-darwin.tar.gz"
-      sha256 "c6517c142481c8df12b767ff48c71f7621cb641b9527e343aab9944b107144de"
+      sha256 "d8248a7af2ccc07c21ba7920a4420745b4b5a4c77324503796fa385d5e84f740"
     end
   end
 
   on_linux do
     url "https://github.com/yauyy/grove/releases/download/v#{version}/grove-x86_64-unknown-linux-gnu.tar.gz"
-    sha256 "8db5c1f809c0dba1124c7c7c79eababf9e6333fcea8b7c3dffaab5dd222a0325"
+    sha256 "c099b3b97f6387d0f2a2f765f0a9801c0b377afcb1faea4f893ffb6711a11714"
   end
 
   def install
