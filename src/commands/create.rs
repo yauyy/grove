@@ -125,7 +125,9 @@ pub fn run(name: Option<String>) -> Result<()> {
         let repo_dir = Path::new(&project.path);
         let wt_path = ws_dir.join(&project.name);
 
-        // a. Check if branch already exists
+        // a. Drop stale worktree registrations (e.g. dirs removed by hand) so
+        // they can't hold branches hostage, then check if the branch exists.
+        let _ = git::worktree_prune(repo_dir);
         if git::branch_exists(repo_dir, &branch)? {
             ui::warn(&format!(
                 "Branch '{}' already exists in '{}', skipping",
@@ -152,6 +154,11 @@ pub fn run(name: Option<String>) -> Result<()> {
         };
         match git::worktree_add(repo_dir, &wt_path, &branch, &start_point) {
             Ok(()) => {
+                if global.auto_upstream {
+                    if let Err(e) = git::ensure_upstream_config(repo_dir, &branch) {
+                        ui::warn(&format!("{}: {}", project.name, e));
+                    }
+                }
                 ws_projects.push(WorkspaceProject {
                     name: project.name.clone(),
                     worktree_path: wt_path.to_string_lossy().to_string(),

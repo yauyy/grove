@@ -113,6 +113,26 @@ fn plan_existing_branch_targets(
     }
 }
 
+/// Return the holding worktree path when `branch` is checked out by a worktree
+/// other than the project's own, where `git checkout` would die with a raw
+/// "already checked out" error. Probe errors are ignored: checkout itself will
+/// surface them later.
+fn occupied_elsewhere(wt_path: &Path, branch: &str) -> Option<String> {
+    match git::worktree_for_branch(wt_path, branch) {
+        Ok(Some(holder)) if !git::same_path(Path::new(&holder), wt_path) => Some(holder),
+        _ => None,
+    }
+}
+
+fn occupied_failure(project: &str, branch: &str, holder: &str) -> PrecheckFailure {
+    PrecheckFailure {
+        project: project.to_string(),
+        message: t("branch_checked_out_elsewhere")
+            .replacen("{}", branch, 1)
+            .replacen("{}", holder, 1),
+    }
+}
+
 fn select_branch_preset() -> Result<String> {
     let global = config::load_global_config()?;
     let entries = config::effective_branch_preset_entries(&global);
@@ -159,7 +179,13 @@ fn plan_merge_targets(
         }
 
         match git::branch_exists(wt_path, &target.branch) {
-            Ok(true) => {}
+            Ok(true) => {
+                // gmerge checks the target branch out in this worktree; catch
+                // occupation by the main repo / another worktree up front.
+                if let Some(holder) = occupied_elsewhere(wt_path, &target.branch) {
+                    failures.push(occupied_failure(&wp.name, &target.branch, &holder));
+                }
+            }
             Ok(false) => match git::remote_branch_exists(wt_path, &target.branch) {
                 Ok(true) => {}
                 Ok(false) => failures.push(PrecheckFailure {
@@ -954,6 +980,17 @@ fn gswitch_to_target(
     precheck_clean_worktrees(projects)?;
     let plans = plan_existing_branch_targets(projects, target)?;
 
+    let mut occupied = Vec::new();
+    for plan in &plans {
+        let wt_path = Path::new(&plan.wp.worktree_path);
+        if let Some(holder) = occupied_elsewhere(wt_path, &plan.resolved.branch) {
+            occupied.push(occupied_failure(&plan.wp.name, &plan.resolved.branch, &holder));
+        }
+    }
+    if !occupied.is_empty() {
+        report_precheck_failures(&occupied)?;
+    }
+
     let mut originals = Vec::new();
     for plan in &plans {
         let wt_path = Path::new(&plan.wp.worktree_path);
@@ -1090,6 +1127,15 @@ pub fn gcreate(name: &str) -> Result<()> {
                     "gcreate failed; rollback incomplete for: {}",
                     rollback_failures.join(", ")
                 );
+            }
+        }
+    }
+
+    if global.auto_upstream {
+        for (wp, _project) in &projects {
+            let wt_path = Path::new(&wp.worktree_path);
+            if let Err(e) = git::ensure_upstream_config(wt_path, &new_branch) {
+                ui::warn(&format!("{}: {}", wp.name, e));
             }
         }
     }

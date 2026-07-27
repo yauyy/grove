@@ -223,6 +223,60 @@ pub fn worktree_repair(repo_dir: &Path) -> Result<()> {
     Ok(())
 }
 
+/// Find which worktree (if any) has the given branch checked out.
+/// Works from the main repository or from any linked worktree.
+pub fn worktree_for_branch(dir: &Path, branch: &str) -> Result<Option<String>> {
+    let output = run_git_checked(dir, &["worktree", "list", "--porcelain"])?;
+    let want = format!("refs/heads/{}", branch);
+    let mut current_path: Option<&str> = None;
+    for line in output.stdout.lines() {
+        if let Some(path) = line.strip_prefix("worktree ") {
+            current_path = Some(path);
+        } else if line.strip_prefix("branch ") == Some(want.as_str()) {
+            return Ok(current_path.map(str::to_string));
+        }
+    }
+    Ok(None)
+}
+
+/// Whether two paths refer to the same directory. Canonicalizes to survive
+/// symlinks (e.g. /tmp vs /private/tmp on macOS); falls back to literal
+/// comparison when either path cannot be resolved.
+pub fn same_path(a: &Path, b: &Path) -> bool {
+    match (a.canonicalize(), b.canonicalize()) {
+        (Ok(ca), Ok(cb)) => ca == cb,
+        _ => a == b,
+    }
+}
+
+/// Enable push.autoSetupRemote (repo-level, shared by all worktrees) so a
+/// plain `git push` on a branch without upstream creates origin/<branch> and
+/// records it as the upstream, instead of erroring.
+pub fn enable_push_auto_setup_remote(dir: &Path) -> Result<()> {
+    run_git_checked(dir, &["config", "push.autoSetupRemote", "true"])?;
+    Ok(())
+}
+
+/// Point `branch`'s upstream at origin/<branch> when that remote branch
+/// already exists. Returns whether the upstream was set.
+pub fn set_upstream_to_origin(dir: &Path, branch: &str) -> Result<bool> {
+    if !remote_branch_exists(dir, branch)? {
+        return Ok(false);
+    }
+    let upstream = format!("origin/{}", branch);
+    run_git_checked(dir, &["branch", "--set-upstream-to", &upstream, branch])?;
+    Ok(true)
+}
+
+/// Upstream wiring for a grove-created branch: bind origin/<branch> now when
+/// it exists, and enable push.autoSetupRemote so the first manual `git push`
+/// wires it up otherwise.
+pub fn ensure_upstream_config(dir: &Path, branch: &str) -> Result<()> {
+    enable_push_auto_setup_remote(dir)?;
+    set_upstream_to_origin(dir, branch)?;
+    Ok(())
+}
+
 /// Stage all changes.
 pub fn add_all(dir: &Path) -> Result<()> {
     run_git_checked(dir, &["add", "-A"])?;
@@ -688,6 +742,61 @@ mod tests {
         // Force removal still works.
         worktree_remove(repo_dir, &dirty_wt).unwrap();
         assert!(!dirty_wt.exists());
+    }
+
+    #[test]
+    fn test_ensure_upstream_config_enables_auto_setup_and_binds_existing_remote() {
+        let tmp = create_test_repo();
+        let dir = tmp.path();
+        let main_branch = current_branch(dir).unwrap();
+        run_git_checked(dir, &["remote", "add", "origin", "."]).unwrap();
+
+        // No origin/<branch> yet: only push.autoSetupRemote gets enabled.
+        ensure_upstream_config(dir, &main_branch).unwrap();
+        let flag = run_git_checked(dir, &["config", "push.autoSetupRemote"])
+            .unwrap()
+            .stdout;
+        assert_eq!(flag, "true");
+        assert!(!run_git(dir, &["rev-parse", "--abbrev-ref", "@{u}"])
+            .unwrap()
+            .success);
+
+        // Once origin/<branch> exists, re-running binds the upstream.
+        let remote_ref = format!("refs/remotes/origin/{}", main_branch);
+        run_git_checked(dir, &["update-ref", &remote_ref, "HEAD"]).unwrap();
+        ensure_upstream_config(dir, &main_branch).unwrap();
+        let upstream = run_git_checked(dir, &["rev-parse", "--abbrev-ref", "@{u}"])
+            .unwrap()
+            .stdout;
+        assert_eq!(upstream, format!("origin/{}", main_branch));
+    }
+
+    #[test]
+    fn test_worktree_for_branch_finds_holder() {
+        let tmp = create_test_repo();
+        let repo_dir = tmp.path();
+        let main_branch = current_branch(repo_dir).unwrap();
+
+        let wt_path = repo_dir.join("wt-holder");
+        worktree_add(repo_dir, &wt_path, "held-branch", &main_branch).unwrap();
+
+        // The main branch is held by the main repo itself.
+        let holder = worktree_for_branch(repo_dir, &main_branch).unwrap().unwrap();
+        assert!(same_path(Path::new(&holder), repo_dir));
+
+        // The new branch is held by the linked worktree, visible from both dirs.
+        for query_dir in [repo_dir, wt_path.as_path()] {
+            let holder = worktree_for_branch(query_dir, "held-branch")
+                .unwrap()
+                .unwrap();
+            assert!(same_path(Path::new(&holder), &wt_path));
+        }
+
+        // A branch not checked out anywhere returns None.
+        run_git_checked(repo_dir, &["branch", "idle-branch"]).unwrap();
+        assert!(worktree_for_branch(repo_dir, "idle-branch")
+            .unwrap()
+            .is_none());
     }
 
     #[test]

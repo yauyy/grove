@@ -40,9 +40,14 @@ pub fn set(key: &str, value: &str) -> Result<()> {
             cfg::save_global_config(&config)?;
             ui::success(&format!("auto-go-work = {}", config.auto_go_work));
         }
+        "auto-upstream" => {
+            config.auto_upstream = parse_bool(value)?;
+            cfg::save_global_config(&config)?;
+            ui::success(&format!("auto-upstream = {}", config.auto_upstream));
+        }
         _ => {
             bail!(
-                "Unknown config key: '{}'. Valid keys: workpath, git-prefix, commit-message-tool, auto-go-work",
+                "Unknown config key: '{}'. Valid keys: workpath, git-prefix, commit-message-tool, auto-go-work, auto-upstream",
                 key
             );
         }
@@ -60,6 +65,7 @@ pub fn list() -> Result<()> {
     }
     println!("commit-message-tool = {}", config.commit_message_tool);
     println!("auto-go-work = {}", config.auto_go_work);
+    println!("auto-upstream = {}", config.auto_upstream);
 
     let entries = cfg::effective_branch_preset_entries(&config);
     let custom = !config.branch_presets.is_empty();

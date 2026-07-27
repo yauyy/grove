@@ -171,15 +171,34 @@ pub fn add(project: Option<String>) -> Result<()> {
     let wt_path = ws_dir.join(&project.name);
     let branch = ws.branch.clone();
 
+    // Drop stale worktree registrations first so a hand-deleted directory
+    // can't keep the branch marked as checked out.
+    let _ = git::worktree_prune(repo_dir);
+
     // Create the worktree, reusing the branch if it already exists locally.
     let _ = git::fetch(repo_dir);
     if git::branch_exists(repo_dir, &branch)? {
+        if let Ok(Some(holder)) = git::worktree_for_branch(repo_dir, &branch) {
+            bail!(
+                "{}: {}",
+                project.name,
+                t("branch_checked_out_elsewhere")
+                    .replacen("{}", &branch, 1)
+                    .replacen("{}", &holder, 1)
+            );
+        }
         git::worktree_add_existing(repo_dir, &wt_path, &branch)
             .with_context(|| format!("Failed to add worktree for '{}'", project.name))?;
     } else {
         let start_point = git::resolve_remote_start_point(repo_dir, &project.branches.main)?;
         git::worktree_add(repo_dir, &wt_path, &branch, &start_point)
             .with_context(|| format!("Failed to add worktree for '{}'", project.name))?;
+    }
+
+    if config::load_global_config()?.auto_upstream {
+        if let Err(e) = git::ensure_upstream_config(repo_dir, &branch) {
+            ui::warn(&format!("{}: {}", project.name, e));
+        }
     }
 
     // Record in workspaces.toml; roll back the git worktree if persistence fails.

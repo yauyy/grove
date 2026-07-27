@@ -343,6 +343,10 @@ fn en() -> HashMap<&'static str, &'static str> {
     );
     m.insert("wt_pruned", "{}: pruned stale worktrees");
     m.insert("wt_repaired", "{}: repaired worktree links");
+    m.insert(
+        "branch_checked_out_elsewhere",
+        "branch '{}' is already checked out in another worktree: {} — run git there, or free the branch first",
+    );
 
     // grove code
     m.insert("select_workspace_code", "Select workspace to open");
@@ -640,6 +644,10 @@ fn zh() -> HashMap<&'static str, &'static str> {
     );
     m.insert("wt_pruned", "{}: 已清理失效工作树");
     m.insert("wt_repaired", "{}: 已修复工作树链接");
+    m.insert(
+        "branch_checked_out_elsewhere",
+        "分支 '{}' 已被另一个 worktree 检出：{}，请到该目录操作，或先释放该分支",
+    );
 
     // grove code
     m.insert("select_workspace_code", "选择要打开的工作区");

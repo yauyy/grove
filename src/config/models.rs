@@ -13,8 +13,17 @@ pub struct GlobalConfig {
     pub commit_message_tool: String,
     #[serde(default)]
     pub auto_go_work: bool,
+    /// Wire upstream tracking for grove-created branches (push.autoSetupRemote
+    /// plus --set-upstream-to when origin already has the branch) so manual
+    /// `git push` / `git pull` work without -u.
+    #[serde(default = "default_true")]
+    pub auto_upstream: bool,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub branch_presets: BTreeMap<String, String>,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 fn default_language() -> String {
@@ -44,6 +53,7 @@ impl Default for GlobalConfig {
             git_prefix: String::new(),
             commit_message_tool: default_commit_message_tool(),
             auto_go_work: false,
+            auto_upstream: true,
             branch_presets: BTreeMap::new(),
         }
     }
@@ -168,11 +178,21 @@ mod tests {
             git_prefix: String::new(),
             commit_message_tool: "manual".to_string(),
             auto_go_work: false,
+            auto_upstream: false,
             branch_presets: BTreeMap::new(),
         };
         let toml_str = toml::to_string(&config).unwrap();
         let parsed: GlobalConfig = toml::from_str(&toml_str).unwrap();
         assert_eq!(parsed.workpath, "/tmp/my-workspaces");
+        assert!(!parsed.auto_upstream);
+    }
+
+    #[test]
+    fn test_global_config_auto_upstream_defaults_to_true() {
+        assert!(GlobalConfig::default().auto_upstream);
+        // Legacy config files without the field also default to enabled.
+        let parsed: GlobalConfig = toml::from_str("workpath = \"/tmp/w\"").unwrap();
+        assert!(parsed.auto_upstream);
     }
 
     #[test]
